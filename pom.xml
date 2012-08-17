@@ -153,7 +153,8 @@
 		<module>nest-ocean-tools</module>
 		<module>nest-developer-tools</module>
 		<module>nest-src</module>
-  </modules>
+        <module>nest-image-processing</module>
+    </modules>
 
     <dependencyManagement>
         <dependencies>
