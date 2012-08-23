@@ -19,10 +19,10 @@ import org.esa.beam.framework.gpf.Operator;
 import org.esa.beam.framework.gpf.OperatorException;
 import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 
-@OperatorMetadata(alias = "OtsuThresholding",
+@OperatorMetadata(alias = "HysteresisThresholding",
 category = "SAR Tools\\Image Processing",
-description = "OtsuThresholdingOp")
-public class OtsuThresholdingOp extends Operator {
+description = "HysteresisThresholding")
+public class HysteresisThresholdingOp extends Operator {
 
     @Override
     public void initialize() throws OperatorException {

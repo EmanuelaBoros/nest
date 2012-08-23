@@ -44,7 +44,7 @@ import javax.media.jai.PlanarImage;
  * Morphology Operators (Dilate, Erode, Open, Close)
  */
 @OperatorMetadata(alias = "MorphologyOperator",
-category = "SAR Tools\\Speckle Filtering",
+category = "SAR Tools\\Image Processing",
 description = "Morphology Operators")
 public class MorphologyOp extends Operator {
 

@@ -32,19 +32,28 @@
     <categories>Processing</categories>
 
     <extension point="beam-ui:actions">
+        
+        <action>
+            <id>ImageProcessingGroup</id>
+            <class>org.esa.beam.visat.actions.ActionGroup</class>
+            <text>Image Processing</text>
+            <parent>sartools</parent>
+            <placeAfter>CoregistrationGraph</placeAfter>
+        </action>
 
         <action>
             <id>MorphologyOp</id>
             <helpId>MorphologyOp</helpId>
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
-            <parent>SpeckleFilteringGroup</parent>
+            <parent>ImageProcessingGroup</parent>
             <text>Morphology Operators</text>
             <operatorName>MorphologyOperator</operatorName>
             <dialogTitle>>Morphology Operators</dialogTitle>
             <shortDescr>Invoke a Morphology Operator on a single product</shortDescr>
             <targetProductNameSuffix>_Spk</targetProductNameSuffix>
         </action>
+        
     </extension>
 
     <extension point="beam-ui:helpSets">
