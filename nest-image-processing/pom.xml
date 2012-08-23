@@ -1,6 +1,12 @@
 <?xml version="1.0"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
    
+    <parent>
+        <artifactId>nest</artifactId>
+        <groupId>org.esa.nest</groupId>
+        <version>4C-1.1</version>
+    </parent>
+ 
     <modelVersion>4.0.0</modelVersion>
     
     <name>NEST Image Processing</name>
@@ -27,6 +33,14 @@
     </developers>
     <repositories>
         <repository>
+            <id>loci.releases</id>
+            <url>http://dev.loci.wisc.edu/maven2/releases</url>
+        </repository>
+        <repository>
+            <id>loci.snapshots</id>
+            <url>http://dev.loci.wisc.edu/maven2/snapshots</url>
+        </repository>
+        <repository>
             <id>imagej.releases</id>
             <url>http://maven.imagej.net/content/repositories/releases</url>
         </repository>
@@ -42,15 +56,40 @@
             <id>Octopussy maven releases repository</id>
             <url>http://octopussy.ecs.soton.ac.uk/m2/releases/</url>
         </repository>
-
+        <repository>
+            <id>Public Maven Repository at Array Systems Computing Inc</id>
+            <url>http://www.array.ca/nest-web/maven</url>
+        </repository>
+        <repository>
+            <id>Mojo repository</id>
+            <url>http://www.array.ca/nest-web/maven</url>
+        </repository>
+        <repository>
+            <id>imagej.thirdparty</id>
+            <url>http://maven.imagej.net/content/repositories/thirdparty</url>
+        </repository>
     </repositories>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
         <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+        <!--<dependency>
+            <groupId>imagej</groupId>
+            <artifactId>imagej</artifactId>
+            <version>1.37</version>
+        </dependency>
+        <dependency>
+            <groupId>net.imagej</groupId>
+            <artifactId>ij</artifactId>
+            <version>1.45b</version>
+        </dependency>-->
+        <dependency>
             <groupId>org.openimaj</groupId>
-            <artifactId>faces</artifactId>
+            <artifactId>core-image</artifactId>
             <version>1.0.6-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
@@ -60,37 +99,58 @@
             <version>1.0.6-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+
         <dependency>
-            <groupId>org.openimaj</groupId>
-            <artifactId>core-video-capture</artifactId>
-            <version>1.0.6-SNAPSHOT</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.openimaj.hardware</groupId>
-            <artifactId>gps-reader</artifactId>
-            <version>1.0.6-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openimaj.hardware</groupId>
-            <artifactId>compass</artifactId>
-            <version>1.0.6-SNAPSHOT</version>
-        </dependency>
-        <dependency>
+    <groupId>net.imagej</groupId>
+    <artifactId>ij</artifactId>
+    <version>1.45b</version>
+  </dependency>
+        <!--<dependency>
             <groupId>net.imagej</groupId>
-            <artifactId>ij-core</artifactId>
-            <version>2.0.0-SNAPSHOT</version>
-        </dependency>
+            <artifactId>ij</artifactId>
+            <version>1.45b</version>
+        </dependency>-->
+
         <dependency>
             <groupId>org.jaitools</groupId>
             <artifactId>jt-all</artifactId>
             <version>1.2.0</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.8.2</version>
-            <scope>test</scope>
+            <groupId>org.esa.beam</groupId>
+            <artifactId>beam-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.nest</groupId>
+            <artifactId>nest-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.nest</groupId>
+            <artifactId>nest-dat</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.nest</groupId>
+            <artifactId>nest-graph-builder</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.beam</groupId>
+            <artifactId>beam-gpf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>edu.emory.mathcs</groupId>
+            <artifactId>jtransforms</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.beam</groupId>
+            <artifactId>beam-envisat-reader</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.nest</groupId>
+            <artifactId>nest-io</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.esa.nest</groupId>
+            <artifactId>nest-reader-dem</artifactId>
         </dependency>
     </dependencies>
     <build>
@@ -122,11 +182,8 @@
                         <year>${project.inceptionYear}</year>
                     </properties>
                     <excludes>
-                        <exclude>AUTHORS</exclude>
-                        <exclude>COPYING</exclude>
                         <exclude>globalfeatures</exclude>
                         <exclude>pairwisecomp</exclude>
-                        <exclude>README</exclude>
                         <exclude>parallelExecutor</exclude>
                         <exclude>segmenting_globalfeatures</exclude>
                         <exclude>segmenting_pairwisecomp</exclude>

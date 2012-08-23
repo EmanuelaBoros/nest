@@ -1,0 +1,69 @@
+
+<module>
+    <manifestVersion>1.0.0</manifestVersion>
+    <symbolicName>nest-image-processing</symbolicName>
+    <version>4C-1.1</version>
+    <name>NEST Image Processing</name>
+    <description>NEST Image Processing</description>
+	
+    <vendor>Array Systems Computing Inc</vendor>
+    <contactAddress>1120 Finch Ave W. Toronto (Canada)</contactAddress>
+    <copyright>(C) 2012 by Array Systems Computing Inc</copyright>
+    <url>http://www.array.ca/nest</url>
+    <licenseUrl>http://www.gnu.org/licenses/gpl.html</licenseUrl>
+    <funding>European Space Agency</funding>
+
+    <dependency>
+        <module>beam-core</module>
+    </dependency>
+    <dependency>
+        <module>beam-gpf</module>
+    </dependency>
+    <dependency>
+        <module>nest-core</module>
+    </dependency>
+    <dependency>
+        <module>nest-graph-builder</module>
+    </dependency>
+    <dependency>
+        <module>nest-dat</module>
+    </dependency>
+
+    <categories>Processing</categories>
+
+    <extension point="beam-ui:actions">
+
+        <!--<action>
+            <id>MorphologyOp</id>
+            <helpId>MorphologyOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>SpeckleFilteringGroup</parent>
+            <text>dfgfdgfd</text>
+            <operatorName>Dilate-Operator</operatorName>
+            <dialogTitle>Morphology Operator</dialogTitle>
+            <shortDescr>Invoke a Morphology operator on a single product</shortDescr>
+            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
+        </action>-->
+        <action>
+            <id>MorphologyOp2</id>
+            <helpId>MorphologyOp2</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>SpeckleFilteringGroup</parent>
+            <text>Morphology Operators</text>
+            <operatorName>MorphologyOperator</operatorName>
+            <dialogTitle>>Morphology Operators</dialogTitle>
+            <shortDescr>Invoke the Speckle Filter operator on a single product</shortDescr>
+            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
+        </action>
+    </extension>
+
+    <extension point="beam-ui:helpSets">
+        <helpSet>
+            <parent>beam-help</parent>
+            <id>sartoolsHelp</id>
+            <path>doc/help/sartools.hs</path>
+        </helpSet>
+    </extension>
+</module>
