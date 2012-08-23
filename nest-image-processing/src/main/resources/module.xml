@@ -33,28 +33,16 @@
 
     <extension point="beam-ui:actions">
 
-        <!--<action>
+        <action>
             <id>MorphologyOp</id>
             <helpId>MorphologyOp</helpId>
-            <class>org.esa.nest.dat.actions.OperatorAction</class>
-            <icon>esaIcon</icon>
-            <parent>SpeckleFilteringGroup</parent>
-            <text>dfgfdgfd</text>
-            <operatorName>Dilate-Operator</operatorName>
-            <dialogTitle>Morphology Operator</dialogTitle>
-            <shortDescr>Invoke a Morphology operator on a single product</shortDescr>
-            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
-        </action>-->
-        <action>
-            <id>MorphologyOp2</id>
-            <helpId>MorphologyOp2</helpId>
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>SpeckleFilteringGroup</parent>
             <text>Morphology Operators</text>
             <operatorName>MorphologyOperator</operatorName>
             <dialogTitle>>Morphology Operators</dialogTitle>
-            <shortDescr>Invoke the Speckle Filter operator on a single product</shortDescr>
+            <shortDescr>Invoke a Morphology Operator on a single product</shortDescr>
             <targetProductNameSuffix>_Spk</targetProductNameSuffix>
         </action>
     </extension>
