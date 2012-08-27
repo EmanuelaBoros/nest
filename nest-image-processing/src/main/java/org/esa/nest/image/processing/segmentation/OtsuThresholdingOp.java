@@ -13,8 +13,9 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.morphology;
+package org.esa.nest.image.processing.segmentation;
 
+import org.esa.nest.image.processing.morphology.*;
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
 import ij.process.ImageProcessor;
@@ -39,14 +40,14 @@ import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Morphology Operators: Dilate, Erode, Open, Close
- */
-@OperatorMetadata(alias = "MorphologyOperator",
-category = "SAR Tools\\Morphology Operators",
-description = "Dilate, Erode, Open, Close")
-public class MorphologyOp extends Operator {
+@OperatorMetadata(alias = "OtsuThresholding",
+category = "SAR Tools\\Image Processing",
+description = "OtsuThresholdingOp")
+public class OtsuThresholdingOp extends Operator {
 
+    private static float[] probabilityHistogram;
+    public static boolean probabilityHistogramDone;
+    public static int N;
     @SourceProduct(alias = "source")
     private Product sourceProduct = null;
     @TargetProduct
@@ -54,16 +55,6 @@ public class MorphologyOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(valueSet = {DILATE_OPERATOR, ERODE_OPERATOR, OPEN_OPERATOR,
-        CLOSE_OPERATOR}, defaultValue = DILATE_OPERATOR,
-    label = "Operator")
-    private String operator;
-    @Parameter(description = "Iterations", interval = "[1, 100]", defaultValue = "1", label = "Iterations")
-    private int nIterations = 1;
-    static final String DILATE_OPERATOR = "Dilate";
-    static final String ERODE_OPERATOR = "Erode";
-    static final String OPEN_OPERATOR = "Open";
-    static final String CLOSE_OPERATOR = "Close";
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
@@ -77,24 +68,7 @@ public class MorphologyOp extends Operator {
      * Default constructor. The graph processing framework requires that an
      * operator has a default constructor.
      */
-    public MorphologyOp() {
-    }
-
-    /**
-     * Set the morphology operator. This function is used by unit test only.
-     *
-     * @param s The filter name.
-     */
-    public void SetOperator(String s) {
-
-        if (s.equals(DILATE_OPERATOR)
-                || s.equals(ERODE_OPERATOR)
-                || s.equals(OPEN_OPERATOR)
-                || s.equals(CLOSE_OPERATOR)) {
-            operator = s;
-        } else {
-            throw new OperatorException(s + " is an invalid filter name.");
-        }
+    public OtsuThresholdingOp() {
     }
 
     /**
@@ -187,6 +161,93 @@ public class MorphologyOp extends Operator {
         }
     }
 
+    private class GrayLevel {
+
+        private int index;
+        private float omega;
+        private float mu;
+
+        public GrayLevel(ImageProcessor imageProcessor, boolean isFirst) {
+
+            if (!probabilityHistogramDone) {
+                int[] histogram = imageProcessor.getHistogram();
+                int length = histogram.length;
+                probabilityHistogram = new float[length];
+
+                for (int i = 0; i < length; i++) {
+                    probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+                }
+                probabilityHistogramDone = true;
+            }
+
+            if (isFirst) {
+                index = 1;
+                omega = probabilityHistogram[index - 1];
+                if (omega == 0) {
+                    mu = 0;
+                } else {
+                    mu = 1 * probabilityHistogram[index - 1] / omega;
+                }
+            } else {
+                index = 2;
+                omega = 0;
+                mu = 0;
+                for (int i = index; i < probabilityHistogram.length; i++) {
+                    omega += probabilityHistogram[i - 1];
+                    mu += probabilityHistogram[i - 1] * i;
+                }
+                if (omega == 0) {
+                    mu = 0;
+                } else {
+                    mu /= omega;
+                }
+            }
+        }
+
+        public void removeFromBeginning() {
+            index++;
+            mu = 0;
+            omega = 0;
+
+            for (int i = index; i < probabilityHistogram.length; i++) {
+                omega += probabilityHistogram[i - 1];
+                mu += i * probabilityHistogram[i - 1];//i*
+            }
+            if (omega == 0) {
+                mu = 0;
+            } else {
+                mu /= omega;
+            }
+        }
+
+        public void addToEnd() {
+            index++;
+            mu = 0;
+            omega = 0;
+            for (int i = 1; i < index; i++) {
+                omega += probabilityHistogram[i - 1];
+                mu += i * probabilityHistogram[i - 1];
+            }
+            if (omega == 0) {
+                mu = 0;
+            } else {
+                mu /= omega;
+            }
+        }
+
+        public float getMu() {
+            return mu;
+        }
+
+        public float getOmega() {
+            return omega;
+        }
+
+        public int getThreshold() {
+            return index;
+        }
+    }
+
     /**
      * Get source tile rectangle.
      *
@@ -226,7 +287,7 @@ public class MorphologyOp extends Operator {
         return new Rectangle(sx0, sy0, sw, sh);
     }
     /**
-     * Filter the given tile of image with Mean filter.
+     * Apply Otsu Thresholding
      *
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
@@ -258,34 +319,69 @@ public class MorphologyOp extends Operator {
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
             processed = true;
         }
+
         final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
         ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
+        int width = fullByteProcessor.getWidth();
+        int height = fullByteProcessor.getHeight();
+
+        int intMax = (int) fullByteProcessor.getMax();
+
+        N = width * height;
+        probabilityHistogramDone = false;
+
+        GrayLevel grayLevelTrue =
+                new GrayLevel(fullByteProcessor, true);
+        GrayLevel grayLevelFalse =
+                new GrayLevel(fullByteProcessor, false);
+
+        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
+                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
+
+        double sigmaMax = 0d;
+        float threshold = 0f;
+
+        for (int i = 0; i < intMax; i++) {
+
+            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
+                    + (double) grayLevelFalse.getOmega()
+                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
+
+            if (sigma > sigmaMax) {
+                sigmaMax = sigma;
+                threshold = grayLevelTrue.getThreshold();
+            }
+
+            grayLevelTrue.addToEnd();
+            grayLevelFalse.removeFromBeginning();
+        }
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
         fullByteProcessor.setRoi(srcTileRectangle);
 
-        ImageProcessor myROIIp = fullByteProcessor.crop();
-        for (int i = 0; i < nIterations; i++) {
-            if (operator.equals(DILATE_OPERATOR)) {
-                myROIIp.dilate();
-            } else if (operator.equals(ERODE_OPERATOR)) {
-                myROIIp.erode();
-            } else if (operator.equals(CLOSE_OPERATOR)) {
-                myROIIp.dilate();
-                myROIIp.erode();
-            } else if (operator.equals(OPEN_OPERATOR)) {
-                myROIIp.erode();
-                myROIIp.dilate();
+        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+
+        int offset = 0;
+
+        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
+
+        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
+            offset = y * roiImageProcessor.getWidth();
+            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
+                int value = pixels[offset + x];
+                if (value <= threshold) {
+                    roiImageProcessor.putPixel(x, y, 0);
+                } else {
+                    roiImageProcessor.putPixel(x, y, 1);
+                }
             }
         }
 
-//        fullImagePlus.setProcessor(myROIIp);
-
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) myROIIp.getPixels());
+        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
@@ -310,7 +406,7 @@ public class MorphologyOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(MorphologyOp.class);
+            super(OtsuThresholdingOp.class);
             setOperatorUI(MorphologyOpUI.class);
         }
     }
