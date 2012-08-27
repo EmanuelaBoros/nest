@@ -226,7 +226,7 @@ public class MorphologyOp extends Operator {
         return new Rectangle(sx0, sy0, sw, sh);
     }
     /**
-     * Filter the given tile of image with Mean filter.
+     * Apply the selected morphology operator
      *
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
@@ -262,30 +262,28 @@ public class MorphologyOp extends Operator {
 
         ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
-
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
         fullByteProcessor.setRoi(srcTileRectangle);
 
-        ImageProcessor myROIIp = fullByteProcessor.crop();
+        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+
         for (int i = 0; i < nIterations; i++) {
             if (operator.equals(DILATE_OPERATOR)) {
-                myROIIp.dilate();
+                roiImageProcessor.dilate();
             } else if (operator.equals(ERODE_OPERATOR)) {
-                myROIIp.erode();
+                roiImageProcessor.erode();
             } else if (operator.equals(CLOSE_OPERATOR)) {
-                myROIIp.dilate();
-                myROIIp.erode();
+                roiImageProcessor.dilate();
+                roiImageProcessor.erode();
             } else if (operator.equals(OPEN_OPERATOR)) {
-                myROIIp.erode();
-                myROIIp.dilate();
+                roiImageProcessor.erode();
+                roiImageProcessor.dilate();
             }
         }
 
-//        fullImagePlus.setProcessor(myROIIp);
-
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) myROIIp.getPixels());
+        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
