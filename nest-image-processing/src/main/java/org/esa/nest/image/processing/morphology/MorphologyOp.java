@@ -225,7 +225,6 @@ public class MorphologyOp extends Operator {
 
         return new Rectangle(sx0, sy0, sw, sh);
     }
-
     /**
      * Filter the given tile of image with Mean filter.
      *
@@ -243,20 +242,26 @@ public class MorphologyOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
+    private static ImagePlus fullImagePlus;
+
     private void computeOperator(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
-        final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-        BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
-                sourceBand.getSceneRasterHeight(),
-                BufferedImage.TYPE_USHORT_GRAY);
-        fullBufferedImage.setData(fullRenderedImage.getData());
+        if (!processed) {
+            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
+            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+                    sourceBand.getSceneRasterHeight(),
+                    BufferedImage.TYPE_USHORT_GRAY);
+            fullBufferedImage.setData(fullRenderedImage.getData());
 
-        final ImagePlus fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-        ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+            processed = true;
+        }
+        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
         ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
@@ -277,7 +282,7 @@ public class MorphologyOp extends Operator {
             }
         }
 
-        fullImagePlus.setProcessor(myROIIp);
+//        fullImagePlus.setProcessor(myROIIp);
 
         final ProductData trgData = targetTile.getDataBuffer();
         final ProductData sourceData = ProductData.createInstance((byte[]) myROIIp.getPixels());
