@@ -63,6 +63,7 @@ public class OtsuThresholdingOp extends Operator {
     private int halfSizeY;
     private int filterSizeX = 3;
     private int filterSizeY = 3;
+    private static ImagePlus fullImagePlus;
 
     /**
      * Default constructor. The graph processing framework requires that an
@@ -152,12 +153,118 @@ public class OtsuThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOperator(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeOtsuThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
         } finally {
             pm.done();
+        }
+    }
+
+    /**
+     * Apply Otsu Thresholding
+     *
+     * @param sourceRaster The source tile for the band.
+     * @param targetTile The current tile associated with the target band to be
+     * computed.
+     * @param x0 X coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param y0 Y coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param w Width for the target_Tile_Rectangle.
+     * @param h Hight for the target_Tile_Rectangle.
+     * @param pm A progress monitor which should be used to determine
+     * computation cancelation requests.
+     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
+     * during computation of the filtered value.
+     */
+    private void computeOtsuThesholding(final Band sourceBand, final Tile sourceRaster,
+            final Tile targetTile, final int x0, final int y0, final int w, final int h,
+            final ProgressMonitor pm) {
+
+        if (!processed) {
+            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
+            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+                    sourceBand.getSceneRasterHeight(),
+                    BufferedImage.TYPE_USHORT_GRAY);
+            fullBufferedImage.setData(fullRenderedImage.getData());
+
+            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+            processed = true;
+        }
+
+        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+
+        int width = fullByteProcessor.getWidth();
+        int height = fullByteProcessor.getHeight();
+
+        int intMax = (int) fullByteProcessor.getMax();
+
+        N = width * height;
+        probabilityHistogramDone = false;
+
+        GrayLevel grayLevelTrue =
+                new GrayLevel(fullByteProcessor, true);
+        GrayLevel grayLevelFalse =
+                new GrayLevel(fullByteProcessor, false);
+
+        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
+                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
+
+        double sigmaMax = 0d;
+        float threshold = 0f;
+
+        for (int i = 0; i < intMax; i++) {
+
+            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
+                    + (double) grayLevelFalse.getOmega()
+                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
+
+            if (sigma > sigmaMax) {
+                sigmaMax = sigma;
+                threshold = grayLevelTrue.getThreshold();
+            }
+
+            grayLevelTrue.addToEnd();
+            grayLevelFalse.removeFromBeginning();
+        }
+
+        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
+
+        fullByteProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+
+        int offset = 0;
+
+        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
+
+        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
+            offset = y * roiImageProcessor.getWidth();
+            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
+                int value = pixels[offset + x];
+                if (value <= threshold) {
+                    roiImageProcessor.putPixel(x, y, 0);
+                } else {
+                    roiImageProcessor.putPixel(x, y, 1);
+                }
+            }
+        }
+
+        final ProductData trgData = targetTile.getDataBuffer();
+        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+
+        final int maxY = y0 + h;
+        final int maxX = x0 + w;
+        for (int y = y0; y < maxY; ++y) {
+            for (int x = x0; x < maxX; ++x) {
+
+                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+            }
         }
     }
 
@@ -285,113 +392,6 @@ public class OtsuThresholdingOp extends Operator {
         }
 
         return new Rectangle(sx0, sy0, sw, sh);
-    }
-    /**
-     * Apply Otsu Thresholding
-     *
-     * @param sourceRaster The source tile for the band.
-     * @param targetTile The current tile associated with the target band to be
-     * computed.
-     * @param x0 X coordinate for the upper-left point of the
-     * target_Tile_Rectangle.
-     * @param y0 Y coordinate for the upper-left point of the
-     * target_Tile_Rectangle.
-     * @param w Width for the target_Tile_Rectangle.
-     * @param h Hight for the target_Tile_Rectangle.
-     * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
-     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
-     * during computation of the filtered value.
-     */
-    private static ImagePlus fullImagePlus;
-
-    private void computeOperator(final Band sourceBand, final Tile sourceRaster,
-            final Tile targetTile, final int x0, final int y0, final int w, final int h,
-            final ProgressMonitor pm) {
-
-        if (!processed) {
-            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
-                    sourceBand.getSceneRasterHeight(),
-                    BufferedImage.TYPE_USHORT_GRAY);
-            fullBufferedImage.setData(fullRenderedImage.getData());
-
-            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-            processed = true;
-        }
-
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-
-        int width = fullByteProcessor.getWidth();
-        int height = fullByteProcessor.getHeight();
-
-        int intMax = (int) fullByteProcessor.getMax();
-
-        N = width * height;
-        probabilityHistogramDone = false;
-
-        GrayLevel grayLevelTrue =
-                new GrayLevel(fullByteProcessor, true);
-        GrayLevel grayLevelFalse =
-                new GrayLevel(fullByteProcessor, false);
-
-        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
-                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
-
-        double sigmaMax = 0d;
-        float threshold = 0f;
-
-        for (int i = 0; i < intMax; i++) {
-
-            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
-                    + (double) grayLevelFalse.getOmega()
-                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
-
-            if (sigma > sigmaMax) {
-                sigmaMax = sigma;
-                threshold = grayLevelTrue.getThreshold();
-            }
-
-            grayLevelTrue.addToEnd();
-            grayLevelFalse.removeFromBeginning();
-        }
-
-        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
-
-        fullByteProcessor.setRoi(srcTileRectangle);
-
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
-
-        int offset = 0;
-
-        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
-
-        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
-            offset = y * roiImageProcessor.getWidth();
-            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
-                int value = pixels[offset + x];
-                if (value <= threshold) {
-                    roiImageProcessor.putPixel(x, y, 0);
-                } else {
-                    roiImageProcessor.putPixel(x, y, 1);
-                }
-            }
-        }
-
-        final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
-
-        final int maxY = y0 + h;
-        final int maxX = x0 + w;
-        for (int y = y0; y < maxY; ++y) {
-            for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
-            }
-        }
     }
 
     /**

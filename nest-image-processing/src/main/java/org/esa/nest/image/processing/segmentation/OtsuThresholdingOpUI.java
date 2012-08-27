@@ -41,11 +41,7 @@ public class OtsuThresholdingOpUI extends BaseOperatorUI {
 
     @Override
     public void initParameters() {
-
         OperatorUIUtils.initBandList(bandList, getBandNames());
-//
-//        operator.setSelectedItem(paramMap.get("operator"));
-//        nIterations.setText(String.valueOf(paramMap.get("nIterations")));
     }
 
     @Override
@@ -56,11 +52,7 @@ public class OtsuThresholdingOpUI extends BaseOperatorUI {
 
     @Override
     public void updateParameters() {
-
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
-
-//        paramMap.put("operator", operator.getSelectedItem());
-//        paramMap.put("nIterations", Integer.parseInt(nIterations.getText()));
     }
 
     private JComponent createPanel() {
@@ -70,24 +62,12 @@ public class OtsuThresholdingOpUI extends BaseOperatorUI {
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
         gbc.gridy++;
-//        DialogUtils.addComponent(contentPane, gbc, "Operator:", operator);
-
-//        operator.addItemListener(new ItemListener() {
-//
-//            public void itemStateChanged(ItemEvent event) {
-//                updateFilterSelection();
-//            }
-//        });
-
         gbc.gridy++;
         final int savedY = gbc.gridy;
-//        DialogUtils.addComponent(contentPane, gbc, nIterationsLabel, nIterations);
         gbc.gridy++;
         gbc.gridy = savedY;
         gbc.weightx = 1.0;
         contentPane.add(new JPanel(), gbc);
-
-//        DialogUtils.enableComponents(nIterationsLabel, nIterations, true);
         return contentPane;
     }
 }
