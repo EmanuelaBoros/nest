@@ -17,9 +17,10 @@ package org.esa.nest.image.processing.morphology;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
-import ij.process.ImageConverter;
 import ij.process.ImageProcessor;
 import org.esa.beam.framework.datamodel.Band;
+import ij.process.ByteProcessor;
+
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.framework.gpf.Operator;
@@ -30,22 +31,21 @@ import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
+import org.esa.nest.datamodel.Unit;
 import org.esa.nest.gpf.OperatorUtils;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
-import java.awt.image.VolatileImage;
 import java.util.HashMap;
 import java.util.Map;
-import javax.media.jai.PlanarImage;
 
 /**
- * Morphology Operators (Dilate, Erode, Open, Close)
+ * Applies a Speckle Filter to the data
  */
 @OperatorMetadata(alias = "MorphologyOperator",
-category = "SAR Tools\\Image Processing",
-description = "Morphology Operators")
+category = "SAR Tools\\Morphology Operators",
+description = "Dilate, Erode, Open, Close")
 public class MorphologyOp extends Operator {
 
     @SourceProduct(alias = "source")
@@ -69,7 +69,15 @@ public class MorphologyOp extends Operator {
     private int sourceImageWidth;
     private int sourceImageHeight;
     private boolean processed = false;
+    private int halfSizeX;
+    private int halfSizeY;
+    private int filterSizeX = 3;
+    private int filterSizeY = 3;
 
+    /**
+     * Default constructor. The graph processing framework requires that an
+     * operator has a default constructor.
+     */
     public MorphologyOp() {
     }
 
@@ -111,6 +119,9 @@ public class MorphologyOp extends Operator {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
             sourceImageHeight = sourceProduct.getSceneRasterHeight();
 
+            halfSizeX = filterSizeX / 2;
+            halfSizeY = filterSizeY / 2;
+
             createTargetProduct();
 
         } catch (Throwable e) {
@@ -133,8 +144,7 @@ public class MorphologyOp extends Operator {
         OperatorUtils.copyProductNodes(sourceProduct, targetProduct);
 
         OperatorUtils.addSelectedBands(
-                sourceProduct, sourceBandNames, targetProduct,
-                targetBandNameToSourceBandName, true);
+                sourceProduct, sourceBandNames, targetProduct, targetBandNameToSourceBandName, true);
     }
 
     /**
@@ -160,26 +170,29 @@ public class MorphologyOp extends Operator {
             final int w = targetTileRectangle.width;
             final int h = targetTileRectangle.height;
 
-            Tile sourceRaster;
+            final Rectangle sourceTileRectangle = getSourceTileRectangle(x0, y0, w, h);
+            Tile sourceRaster1;
+            Tile sourceRaster2 = null;
             final String[] srcBandNames = targetBandNameToSourceBandName.get(targetBand.getName());
-            Band sourceBand = sourceProduct.getBand(srcBandNames[0]);
-            sourceRaster = getSourceTile(sourceBand, targetTileRectangle);
-
-            if (sourceRaster == null) {
-                throw new OperatorException("Cannot get source tile");
-            }
-            if (!processed) {
-                compute(sourceBand, pm);
-            }
-            final ProductData targetData = targetTile.getDataBuffer();
-            final ProductData sourceData = sourceRaster.getDataBuffer();
-
-            for (int y = y0; y < y0 + h; y++) {
-                for (int x = x0; x < x0 + w; x++) {
-                    final int index = sourceRaster.getDataBufferIndex(x, y);
-                    targetData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), sourceData.getElemFloatAt(index));
+            Band sourceBand1;
+            if (srcBandNames.length == 1) {
+                sourceBand1 = sourceProduct.getBand(srcBandNames[0]);
+                sourceRaster1 = getSourceTile(sourceBand1, sourceTileRectangle);
+                if (sourceRaster1 == null) {
+                    throw new OperatorException("Cannot get source tile");
+                }
+            } else {
+                sourceBand1 = sourceProduct.getBand(srcBandNames[0]);
+                Band sourceBand2 = sourceProduct.getBand(srcBandNames[1]);
+                sourceRaster1 = getSourceTile(sourceBand1, sourceTileRectangle);
+                sourceRaster2 = getSourceTile(sourceBand2, sourceTileRectangle);
+                if (sourceRaster1 == null || sourceRaster2 == null) {
+                    throw new OperatorException("Cannot get source tile");
                 }
             }
+
+            computeOperator(sourceBand1, sourceRaster1, targetTile, x0, y0, w, h, pm);
+
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
         } finally {
@@ -187,80 +200,112 @@ public class MorphologyOp extends Operator {
         }
     }
 
-    private synchronized void compute(final Band sourceBand,
-            final ProgressMonitor progressMonitor) {
+    /**
+     * Get source tile rectangle.
+     *
+     * @param x0 X coordinate of the upper left corner point of the target tile
+     * rectangle.
+     * @param y0 Y coordinate of the upper left corner point of the target tile
+     * rectangle.
+     * @param w The width of the target tile rectangle.
+     * @param h The height of the target tile rectangle.
+     * @return The source tile rectangle.
+     */
+    private Rectangle getSourceTileRectangle(int x0, int y0, int w, int h) {
 
-        if (processed) {
-            return;
+        int sx0 = x0;
+        int sy0 = y0;
+        int sw = w;
+        int sh = h;
+
+        if (x0 >= halfSizeX) {
+            sx0 -= halfSizeX;
+            sw += halfSizeX;
         }
 
-        try {
-            final RenderedImage ri = sourceBand.getSourceImage().getImage(0);
-
-            BufferedImage img = new BufferedImage(sourceBand.getSceneRasterWidth(), sourceBand.getSceneRasterHeight(),
-                    BufferedImage.TYPE_USHORT_GRAY);
-            img = PlanarImage.wrapRenderedImage(ri).getAsBufferedImage();
-            final ImagePlus imp = new ImagePlus(sourceBand.getDisplayName(), img);
-            ImageProcessor ip = imp.getProcessor();
-
-            for (int i = 0; i < nIterations; i++) {
-                if (operator.equals(DILATE_OPERATOR)) {
-                    ip.dilate();
-                } else if (operator.equals(ERODE_OPERATOR)) {
-                    ip.erode();
-                } else if (operator.equals(CLOSE_OPERATOR)) {
-                    ip.dilate();
-                    progressMonitor.worked(1);
-                    ip.erode();
-                } else if (operator.equals(OPEN_OPERATOR)) {
-                    ip.erode();
-                    progressMonitor.worked(1);
-                    ip.dilate();
-                }
-            }
-
-            progressMonitor.worked(1);
-
-            imp.setProcessor(ip.convertToShort(true));
-            imp.setCalibration(imp.getCalibration());
-            ImageConverter ic = new ImageConverter(imp);
-            ic.convertToGray32();
-
-            progressMonitor.worked(1);
-
-            RenderedImage renderedImage = toBufferedImage(imp.getImage(), BufferedImage.TYPE_USHORT_GRAY);
-
-            progressMonitor.worked(1);
-
-            sourceBand.setSourceImage(renderedImage);
-
-            progressMonitor.worked(1);
-
-            processed = true;
-        } catch (Throwable t) {
-            OperatorUtils.catchOperatorException(this.getId(), t);
-        } finally {
-            progressMonitor.done();
+        if (y0 >= halfSizeY) {
+            sy0 -= halfSizeY;
+            sh += halfSizeY;
         }
+
+        if (x0 + w + halfSizeX <= sourceImageWidth) {
+            sw += halfSizeX;
+        }
+
+        if (y0 + h + halfSizeY <= sourceImageHeight) {
+            sh += halfSizeY;
+        }
+
+        return new Rectangle(sx0, sy0, sw, sh);
     }
 
-    private static BufferedImage toBufferedImage(final Image image, final int type) {
+    /**
+     * Filter the given tile of image with Mean filter.
+     *
+     * @param sourceRaster1 The source tile for the 1st band.
+     * @param sourceRaster2 The source tile for the 2nd band.
+     * @param unit Unit for the 1st band.
+     * @param targetTile The current tile associated with the target band to be
+     * computed.
+     * @param x0 X coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param y0 Y coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param w Width for the target_Tile_Rectangle.
+     * @param h Hight for the target_Tile_Rectangle.
+     * @param pm A progress monitor which should be used to determine
+     * computation cancelation requests.
+     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
+     * during computation of the filtered value.
+     */
+    private void computeOperator(final Band sourceBand, final Tile sourceRaster1,
+            final Tile targetTile, final int x0, final int y0, final int w, final int h,
+            final ProgressMonitor pm) {
+        
+        final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
+        BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+                sourceBand.getSceneRasterHeight(),
+                BufferedImage.TYPE_USHORT_GRAY);
+        fullBufferedImage.setData(fullRenderedImage.getData());
 
-        if (image instanceof BufferedImage) {
-            return (BufferedImage) image;
-        }
-        if (image instanceof VolatileImage) {
-            return ((VolatileImage) image).getSnapshot();
+        final ImagePlus fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+        ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+
+        final Rectangle srcTileRectangle = sourceRaster1.getRectangle();
+
+        fullByteProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor myROIIp = fullByteProcessor.crop();
+        for (int i = 0; i < nIterations; i++) {
+            if (operator.equals(DILATE_OPERATOR)) {
+                myROIIp.dilate();
+            } else if (operator.equals(ERODE_OPERATOR)) {
+                myROIIp.erode();
+            } else if (operator.equals(CLOSE_OPERATOR)) {
+                myROIIp.dilate();
+                myROIIp.erode();
+            } else if (operator.equals(OPEN_OPERATOR)) {
+                myROIIp.erode();
+                myROIIp.dilate();
+            }
         }
 
-        final BufferedImage buffImg = new BufferedImage(image.getWidth(null),
-                image.getHeight(null), type);
-        final Graphics2D g2 = buffImg.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-        g2.drawImage(image, null, null);
-        g2.dispose();
-        return buffImg;
+        fullImagePlus.setProcessor(myROIIp);
+
+        final ProductData trgData = targetTile.getDataBuffer();
+        final ProductData sourceData = ProductData.createInstance((byte[]) myROIIp.getPixels());
+
+        final int maxY = y0 + h;
+        final int maxX = x0 + w;
+        for (int y = y0; y < maxY; ++y) {
+            for (int x = x0; x < maxX; ++x) {
+
+                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemDoubleAt(sourceRaster1.getDataBufferIndex(x, y)));
+            }
+        }
     }
 
     /**

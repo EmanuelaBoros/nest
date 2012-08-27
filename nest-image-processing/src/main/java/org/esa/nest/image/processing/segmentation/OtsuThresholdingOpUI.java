@@ -13,29 +13,21 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.morphology;
+package org.esa.nest.image.processing.segmentation;
 
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.util.Map;
+import javax.swing.*;
 import org.esa.beam.framework.gpf.ui.BaseOperatorUI;
 import org.esa.beam.framework.gpf.ui.UIValidation;
 import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-import java.util.Map;
-
-public class MorphologyOpUI extends BaseOperatorUI {
+public class OtsuThresholdingOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
-    private final JComboBox operator = new JComboBox(new String[]{MorphologyOp2.DILATE_OPERATOR,
-                MorphologyOp2.ERODE_OPERATOR,
-                MorphologyOp2.OPEN_OPERATOR,
-                MorphologyOp2.CLOSE_OPERATOR});
-    private final JLabel nIterationsLabel = new JLabel("Iterations");
-    private final JTextField nIterations = new JTextField("");
 
     @Override
     public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap, AppContext appContext) {
@@ -51,9 +43,9 @@ public class MorphologyOpUI extends BaseOperatorUI {
     public void initParameters() {
 
         OperatorUIUtils.initBandList(bandList, getBandNames());
-
-        operator.setSelectedItem(paramMap.get("operator"));
-        nIterations.setText(String.valueOf(paramMap.get("nIterations")));
+//
+//        operator.setSelectedItem(paramMap.get("operator"));
+//        nIterations.setText(String.valueOf(paramMap.get("nIterations")));
     }
 
     @Override
@@ -67,8 +59,8 @@ public class MorphologyOpUI extends BaseOperatorUI {
 
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
 
-        paramMap.put("operator", operator.getSelectedItem());
-        paramMap.put("nIterations", Integer.parseInt(nIterations.getText()));
+//        paramMap.put("operator", operator.getSelectedItem());
+//        paramMap.put("nIterations", Integer.parseInt(nIterations.getText()));
     }
 
     private JComponent createPanel() {
@@ -78,28 +70,24 @@ public class MorphologyOpUI extends BaseOperatorUI {
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
         gbc.gridy++;
-        DialogUtils.addComponent(contentPane, gbc, "Operator:", operator);
+//        DialogUtils.addComponent(contentPane, gbc, "Operator:", operator);
 
-        operator.addItemListener(new ItemListener() {
-
-            public void itemStateChanged(ItemEvent event) {
-                updateOperatorSelection();
-            }
-        });
+//        operator.addItemListener(new ItemListener() {
+//
+//            public void itemStateChanged(ItemEvent event) {
+//                updateFilterSelection();
+//            }
+//        });
 
         gbc.gridy++;
         final int savedY = gbc.gridy;
-        DialogUtils.addComponent(contentPane, gbc, nIterationsLabel, nIterations);
+//        DialogUtils.addComponent(contentPane, gbc, nIterationsLabel, nIterations);
         gbc.gridy++;
         gbc.gridy = savedY;
         gbc.weightx = 1.0;
         contentPane.add(new JPanel(), gbc);
 
-        DialogUtils.enableComponents(nIterationsLabel, nIterations, true);
+//        DialogUtils.enableComponents(nIterationsLabel, nIterations, true);
         return contentPane;
-    }
-
-    private void updateOperatorSelection() {
-        final String item = (String) operator.getSelectedItem();
     }
 }

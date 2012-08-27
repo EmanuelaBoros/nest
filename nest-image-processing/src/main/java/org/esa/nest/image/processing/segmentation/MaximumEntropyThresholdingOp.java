@@ -13,16 +13,16 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.thresholding;
+package org.esa.nest.image.processing.segmentation;
 
 import org.esa.beam.framework.gpf.Operator;
 import org.esa.beam.framework.gpf.OperatorException;
 import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 
-@OperatorMetadata(alias = "HysteresisThresholding",
+@OperatorMetadata(alias = "MaximumEntropyThresholding",
 category = "SAR Tools\\Image Processing",
-description = "HysteresisThresholding")
-public class HysteresisThresholdingOp extends Operator {
+description = "MaximumEntropyThresholding")
+public class MaximumEntropyThresholdingOp extends Operator {
 
     @Override
     public void initialize() throws OperatorException {

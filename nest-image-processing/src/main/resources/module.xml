@@ -49,11 +49,22 @@
             <parent>ImageProcessingGroup</parent>
             <text>Morphology Operators</text>
             <operatorName>MorphologyOperator</operatorName>
-            <dialogTitle>>Morphology Operators</dialogTitle>
+            <dialogTitle>Morphology Operators</dialogTitle>
             <shortDescr>Invoke a Morphology Operator on a single product</shortDescr>
             <targetProductNameSuffix>_Spk</targetProductNameSuffix>
         </action>
-        
+        <action>
+            <id>OtsuThresholdingOp</id>
+            <helpId>OtsuThresholdingOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>Otsu Thresholding</text>
+            <operatorName>OtsuThresholding</operatorName>
+            <dialogTitle>Otsu Thresholding</dialogTitle>
+            <shortDescr>Invoke Otsu Thresholding on a single product</shortDescr>
+            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
+        </action>
     </extension>
 
     <extension point="beam-ui:helpSets">

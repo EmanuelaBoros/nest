@@ -1,1 +1,2 @@
 org.esa.nest.image.processing.morphology.MorphologyOp$Spi
+org.esa.nest.image.processing.segmentation.OtsuThresholdingOp$Spi
