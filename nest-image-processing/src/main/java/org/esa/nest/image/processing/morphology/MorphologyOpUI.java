@@ -15,6 +15,7 @@
  */
 package org.esa.nest.image.processing.morphology;
 
+import org.esa.nest.image.processing.defaulting.MorphologyOp2;
 import org.esa.beam.framework.gpf.ui.BaseOperatorUI;
 import org.esa.beam.framework.gpf.ui.UIValidation;
 import org.esa.beam.framework.ui.AppContext;
@@ -30,10 +31,10 @@ import java.util.Map;
 public class MorphologyOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
-    private final JComboBox operator = new JComboBox(new String[]{MorphologyOp2.DILATE_OPERATOR,
-                MorphologyOp2.ERODE_OPERATOR,
-                MorphologyOp2.OPEN_OPERATOR,
-                MorphologyOp2.CLOSE_OPERATOR});
+    private final JComboBox operator = new JComboBox(new String[]{MorphologyOp.DILATE_OPERATOR,
+                MorphologyOp.ERODE_OPERATOR,
+                MorphologyOp.OPEN_OPERATOR,
+                MorphologyOp.CLOSE_OPERATOR});
     private final JLabel nIterationsLabel = new JLabel("Iterations");
     private final JTextField nIterations = new JTextField("");
 
@@ -82,6 +83,7 @@ public class MorphologyOpUI extends BaseOperatorUI {
 
         operator.addItemListener(new ItemListener() {
 
+            @Override
             public void itemStateChanged(ItemEvent event) {
                 updateOperatorSelection();
             }

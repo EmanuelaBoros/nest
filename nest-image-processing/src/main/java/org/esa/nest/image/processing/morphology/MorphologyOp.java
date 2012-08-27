@@ -31,7 +31,6 @@ import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
-import org.esa.nest.datamodel.Unit;
 import org.esa.nest.gpf.OperatorUtils;
 
 import java.awt.*;
@@ -41,7 +40,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Applies a Speckle Filter to the data
+ * Morphology Operators: Dilate, Erode, Open, Close
  */
 @OperatorMetadata(alias = "MorphologyOperator",
 category = "SAR Tools\\Morphology Operators",
@@ -82,11 +81,11 @@ public class MorphologyOp extends Operator {
     }
 
     /**
-     * Set speckle filter. This function is used by unit test only.
+     * Set the morphology operator. This function is used by unit test only.
      *
      * @param s The filter name.
      */
-    public void SetFilter(String s) {
+    public void SetOperator(String s) {
 
         if (s.equals(DILATE_OPERATOR)
                 || s.equals(ERODE_OPERATOR)
@@ -171,27 +170,15 @@ public class MorphologyOp extends Operator {
             final int h = targetTileRectangle.height;
 
             final Rectangle sourceTileRectangle = getSourceTileRectangle(x0, y0, w, h);
-            Tile sourceRaster1;
-            Tile sourceRaster2 = null;
+            Tile sourceRaster;
             final String[] srcBandNames = targetBandNameToSourceBandName.get(targetBand.getName());
-            Band sourceBand1;
-            if (srcBandNames.length == 1) {
-                sourceBand1 = sourceProduct.getBand(srcBandNames[0]);
-                sourceRaster1 = getSourceTile(sourceBand1, sourceTileRectangle);
-                if (sourceRaster1 == null) {
-                    throw new OperatorException("Cannot get source tile");
-                }
-            } else {
-                sourceBand1 = sourceProduct.getBand(srcBandNames[0]);
-                Band sourceBand2 = sourceProduct.getBand(srcBandNames[1]);
-                sourceRaster1 = getSourceTile(sourceBand1, sourceTileRectangle);
-                sourceRaster2 = getSourceTile(sourceBand2, sourceTileRectangle);
-                if (sourceRaster1 == null || sourceRaster2 == null) {
-                    throw new OperatorException("Cannot get source tile");
-                }
+            Band sourceBand = sourceProduct.getBand(srcBandNames[0]);
+            sourceRaster = getSourceTile(sourceBand, sourceTileRectangle);
+            if (sourceRaster == null) {
+                throw new OperatorException("Cannot get source tile");
             }
 
-            computeOperator(sourceBand1, sourceRaster1, targetTile, x0, y0, w, h, pm);
+            computeOperator(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -242,9 +229,7 @@ public class MorphologyOp extends Operator {
     /**
      * Filter the given tile of image with Mean filter.
      *
-     * @param sourceRaster1 The source tile for the 1st band.
-     * @param sourceRaster2 The source tile for the 2nd band.
-     * @param unit Unit for the 1st band.
+     * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
      * computed.
      * @param x0 X coordinate for the upper-left point of the
@@ -258,10 +243,10 @@ public class MorphologyOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeOperator(final Band sourceBand, final Tile sourceRaster1,
+    private void computeOperator(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
-        
+
         final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
         BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
                 sourceBand.getSceneRasterHeight(),
@@ -273,7 +258,7 @@ public class MorphologyOp extends Operator {
 
         ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
-        final Rectangle srcTileRectangle = sourceRaster1.getRectangle();
+        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
         fullByteProcessor.setRoi(srcTileRectangle);
 
@@ -303,7 +288,7 @@ public class MorphologyOp extends Operator {
             for (int x = x0; x < maxX; ++x) {
 
                 trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster1.getDataBufferIndex(x, y)));
+                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
     }
