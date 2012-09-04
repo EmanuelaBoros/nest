@@ -153,7 +153,7 @@ public class OtsuThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOtsuThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeOtsuThresholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -175,11 +175,11 @@ public class OtsuThresholdingOp extends Operator {
      * @param w Width for the target_Tile_Rectangle.
      * @param h Hight for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
+     * computation cancellation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeOtsuThesholding(final Band sourceBand, final Tile sourceRaster,
+    private void computeOtsuThresholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -246,10 +246,10 @@ public class OtsuThresholdingOp extends Operator {
             offset = y * roiImageProcessor.getWidth();
             for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
                 int value = pixels[offset + x];
-                if (value <= threshold) {
+                if ((pixels[offset + x] & 0xff) <= threshold){
                     roiImageProcessor.putPixel(x, y, 0);
                 } else {
-                    roiImageProcessor.putPixel(x, y, 1);
+//                    roiImageProcessor.putPixel(x, y, 1);
                 }
             }
         }
@@ -407,7 +407,7 @@ public class OtsuThresholdingOp extends Operator {
 
         public Spi() {
             super(OtsuThresholdingOp.class);
-            setOperatorUI(MorphologyOpUI.class);
+            setOperatorUI(OtsuThresholdingOpUI.class);
         }
     }
 }

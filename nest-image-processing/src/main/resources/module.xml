@@ -51,7 +51,7 @@
             <operatorName>MorphologyOperator</operatorName>
             <dialogTitle>Morphology Operators</dialogTitle>
             <shortDescr>Invoke a Morphology Operator on a single product</shortDescr>
-            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
+            <targetProductNameSuffix>_Mrh</targetProductNameSuffix>
         </action>
         <action>
             <id>OtsuThresholdingOp</id>
@@ -63,7 +63,32 @@
             <operatorName>OtsuThresholding</operatorName>
             <dialogTitle>Otsu Thresholding</dialogTitle>
             <shortDescr>Invoke Otsu Thresholding on a single product</shortDescr>
-            <targetProductNameSuffix>_Spk</targetProductNameSuffix>
+            <targetProductNameSuffix>_Ot</targetProductNameSuffix>
+        </action>
+        <action>
+            <id>MixtureModelingThresholdingOp</id>
+            <helpId>MixtureModelingThresholdingOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>Mixture Modeling Thresholding</text>
+            <operatorName>MixtureModelingThresholding</operatorName>
+            <dialogTitle>Mixture Modeling Thresholding</dialogTitle>
+            <shortDescr>Invoke Mixture Modeling Thresholding on a single product</shortDescr>
+            <targetProductNameSuffix>_Mmt</targetProductNameSuffix>
+        </action>
+        
+        <action>
+            <id>HysteresisThresholdingOp</id>
+            <helpId>HysteresisThresholdingOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>Hysteresis Thresholding</text>
+            <operatorName>HysteresisThresholding</operatorName>
+            <dialogTitle>Hysteresis Thresholding</dialogTitle>
+            <shortDescr>Invoke Hysteresis Thresholding Thresholding on a single product</shortDescr>
+            <targetProductNameSuffix>_Hys</targetProductNameSuffix>
         </action>
     </extension>
 
