@@ -64,8 +64,8 @@ public class HysteresisThresholdingOpUI extends BaseOperatorUI {
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
 
-        paramMap.put("highThreshold", Double.parseDouble(highThreshold.getText()));
-        paramMap.put("lowThreshold", Double.parseDouble(lowThreshold.getText()));
+        paramMap.put("highThreshold", Float.parseFloat(highThreshold.getText()));
+        paramMap.put("lowThreshold", Float.parseFloat(lowThreshold.getText()));
     }
 
     private JComponent createPanel() {

@@ -18,6 +18,7 @@ package org.esa.nest.image.processing.segmentation;
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.gui.Roi;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import java.awt.Rectangle;
@@ -25,11 +26,13 @@ import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
+import javax.swing.JOptionPane;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.framework.gpf.Operator;
 import org.esa.beam.framework.gpf.OperatorException;
+import org.esa.beam.framework.gpf.OperatorSpi;
 import org.esa.beam.framework.gpf.Tile;
 import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 import org.esa.beam.framework.gpf.annotations.Parameter;
@@ -43,10 +46,8 @@ description = "HysteresisThresholding")
 public class HysteresisThresholdingOp extends Operator {
 
     public static float[] probabilityHistogram;
-    private float threshold;
     final static int MAX_VALUE = 0;
     final static int MIN_VALUE = 256;
-    private boolean probabilityHistogramDone;
     public static int N;
     @SourceProduct(alias = "source")
     private Product sourceProduct = null;
@@ -55,10 +56,10 @@ public class HysteresisThresholdingOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(description = "HighThreshold", defaultValue = "5.0", label = "HighThreshold")
-    private double highThreshold = 5.0;
-    @Parameter(description = "LowThreshold", defaultValue = "1.0", label = "LowThreshold")
-    private double lowThreshold = 1.0;
+    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
+    private float highThreshold = 100f;
+    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
+    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
@@ -68,6 +69,7 @@ public class HysteresisThresholdingOp extends Operator {
     private int filterSizeX = 3;
     private int filterSizeY = 3;
     private static ImagePlus fullImagePlus;
+    private static ByteProcessor fullByteProcessor;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -150,7 +152,7 @@ public class HysteresisThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOtsuThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -176,7 +178,7 @@ public class HysteresisThresholdingOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeOtsuThesholding(final Band sourceBand, final Tile sourceRaster,
+    private void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -188,54 +190,23 @@ public class HysteresisThresholdingOp extends Operator {
             fullBufferedImage.setData(fullRenderedImage.getData());
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+
+            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
+            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
+
             processed = true;
-        }
-
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-
-        int width = fullByteProcessor.getWidth();
-        int height = fullByteProcessor.getHeight();
-
-        int intMax = (int) fullByteProcessor.getMax();
-        N = width * height;
-        probabilityHistogramDone = false;
-
-        ImageStack stack = fullImagePlus.getStack();
-        ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
-        ImageStack res_hyst = new ImageStack(stack.getWidth(), stack.getHeight());
-        ImageProcessor tmp1;
-        ImageProcessor tmp2;
-
-        for (int s = 1; s <= stack.getSize(); s++) {
-            tmp1 = trinarise(stack.getProcessor(s), highThreshold, lowThreshold);
-            tmp2 = hysteresisThresholding(tmp1);
-            res_trin.addSlice("", tmp1);
-            res_hyst.addSlice("", tmp2);
         }
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        fullByteProcessor.setRoi(srcTileRectangle);
+        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
 
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+        aPartProcessor.setRoi(srcTileRectangle);
 
-        int offset = 0;
-
-        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
-
-        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
-            offset = y * roiImageProcessor.getWidth();
-            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
-                int value = pixels[offset + x];
-                if (value > threshold) {
-                    roiImageProcessor.putPixel(x, y, intMax);
-                } else {
-                    roiImageProcessor.putPixel(x, y, 0);
-                }
-            }
-        }
+        ImageProcessor roiImageProcessor = aPartProcessor.crop();
 
         final ProductData trgData = targetTile.getDataBuffer();
         final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
@@ -245,8 +216,8 @@ public class HysteresisThresholdingOp extends Operator {
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
 
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
     }
@@ -259,116 +230,117 @@ public class HysteresisThresholdingOp extends Operator {
      * @param lowThreshold low threshold
      * @return "trinarised" image
      */
-    ImageProcessor trinarise(ImageProcessor imageProcessor, double highThreshold,
-            double lowThreshold) {
+    ImageProcessor trinarise(ByteProcessor imageProcessor, float highThreshold,
+            float lowThreshold) {
 
-        int la = imageProcessor.getWidth();
-        int ha = imageProcessor.getHeight();
-        ByteProcessor res = new ByteProcessor(la, ha);
-        float pix;
+        int width = imageProcessor.getWidth();
+        int height = imageProcessor.getHeight();
+        ImageProcessor returnedProcessor = imageProcessor.duplicate();
 
-        for (int x = 0; x < la; x++) {
-            for (int y = 0; y < ha; y++) {
-                pix = imageProcessor.getPixelValue(x, y);
-                if (pix >= highThreshold) {
-                    res.putPixel(x, y, 255);
-                } else if (pix >= lowThreshold) {
-                    res.putPixel(x, y, 128);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+
+                float value = returnedProcessor.getPixelValue(x, y);
+
+                if (value >= highThreshold) {
+                    returnedProcessor.putPixel(x, y, 255);
+                } else if (value >= lowThreshold) {
+                    returnedProcessor.putPixel(x, y, 128);
                 }
             }
         }
-        return res;
+        return returnedProcessor;
     }
 
     /**
      * Hysteresis thresholding
      *
-     * @param ima original image
+     * @param imageProcessor original image
      * @return thresholded image
      */
-    ImageProcessor hysteresisThresholding(ImageProcessor ima) {
-        int la = ima.getWidth();
-        int ha = ima.getHeight();
-        ImageProcessor res = ima.duplicate();
-        float pix;
+    ImageProcessor hysteresisThresholding(ByteProcessor imageProcessor) {
+
+        int width = imageProcessor.getWidth();
+        int height = imageProcessor.getHeight();
+
+        ImageProcessor returnedProcessor = imageProcessor.duplicate();
         boolean change = true;
 
-        // connection
         while (change) {
             change = false;
-            for (int x = 1; x < la - 1; x++) {
-                for (int y = 1; y < ha - 1; y++) {
-                    if (res.getPixelValue(x, y) == 255) {
-                        if (res.getPixelValue(x + 1, y) == 128) {
+            for (int x = 1; x < width - 1; x++) {
+                for (int y = 1; y < height - 1; y++) {
+                    if (returnedProcessor.getPixelValue(x, y) == 255) {
+                        if (returnedProcessor.getPixelValue(x + 1, y) == 128) {
                             change = true;
-                            res.putPixelValue(x + 1, y, 255);
+                            returnedProcessor.putPixelValue(x + 1, y, 255);
                         }
-                        if (res.getPixelValue(x - 1, y) == 128) {
+                        if (returnedProcessor.getPixelValue(x - 1, y) == 128) {
                             change = true;
-                            res.putPixelValue(x - 1, y, 255);
+                            returnedProcessor.putPixelValue(x - 1, y, 255);
                         }
-                        if (res.getPixelValue(x, y + 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x, y + 1) == 128) {
                             change = true;
-                            res.putPixelValue(x, y + 1, 255);
+                            returnedProcessor.putPixelValue(x, y + 1, 255);
                         }
-                        if (res.getPixelValue(x, y - 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x, y - 1) == 128) {
                             change = true;
-                            res.putPixelValue(x, y - 1, 255);
+                            returnedProcessor.putPixelValue(x, y - 1, 255);
                         }
-                        if (res.getPixelValue(x + 1, y + 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x + 1, y + 1) == 128) {
                             change = true;
-                            res.putPixelValue(x + 1, y + 1, 255);
+                            returnedProcessor.putPixelValue(x + 1, y + 1, 255);
                         }
-                        if (res.getPixelValue(x - 1, y - 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x - 1, y - 1) == 128) {
                             change = true;
-                            res.putPixelValue(x - 1, y - 1, 255);
+                            returnedProcessor.putPixelValue(x - 1, y - 1, 255);
                         }
-                        if (res.getPixelValue(x - 1, y + 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x - 1, y + 1) == 128) {
                             change = true;
-                            res.putPixelValue(x - 1, y + 1, 255);
+                            returnedProcessor.putPixelValue(x - 1, y + 1, 255);
                         }
-                        if (res.getPixelValue(x + 1, y - 1) == 128) {
+                        if (returnedProcessor.getPixelValue(x + 1, y - 1) == 128) {
                             change = true;
-                            res.putPixelValue(x + 1, y - 1, 255);
+                            returnedProcessor.putPixelValue(x + 1, y - 1, 255);
                         }
                     }
                 }
             }
             if (change) {
-                for (int x = la - 2; x > 0; x--) {
-                    for (int y = ha - 2; y > 0; y--) {
-                        if (res.getPixelValue(x, y) == 255) {
-                            if (res.getPixelValue(x + 1, y) == 128) {
+                for (int x = width - 2; x > 0; x--) {
+                    for (int y = height - 2; y > 0; y--) {
+                        if (returnedProcessor.getPixelValue(x, y) == 255) {
+                            if (returnedProcessor.getPixelValue(x + 1, y) == 128) {
                                 change = true;
-                                res.putPixelValue(x + 1, y, 255);
+                                returnedProcessor.putPixelValue(x + 1, y, 255);
                             }
-                            if (res.getPixelValue(x - 1, y) == 128) {
+                            if (returnedProcessor.getPixelValue(x - 1, y) == 128) {
                                 change = true;
-                                res.putPixelValue(x - 1, y, 255);
+                                returnedProcessor.putPixelValue(x - 1, y, 255);
                             }
-                            if (res.getPixelValue(x, y + 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x, y + 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x, y + 1, 255);
+                                returnedProcessor.putPixelValue(x, y + 1, 255);
                             }
-                            if (res.getPixelValue(x, y - 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x, y - 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x, y - 1, 255);
+                                returnedProcessor.putPixelValue(x, y - 1, 255);
                             }
-                            if (res.getPixelValue(x + 1, y + 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x + 1, y + 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x + 1, y + 1, 255);
+                                returnedProcessor.putPixelValue(x + 1, y + 1, 255);
                             }
-                            if (res.getPixelValue(x - 1, y - 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x - 1, y - 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x - 1, y - 1, 255);
+                                returnedProcessor.putPixelValue(x - 1, y - 1, 255);
                             }
-                            if (res.getPixelValue(x - 1, y + 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x - 1, y + 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x - 1, y + 1, 255);
+                                returnedProcessor.putPixelValue(x - 1, y + 1, 255);
                             }
-                            if (res.getPixelValue(x + 1, y - 1) == 128) {
+                            if (returnedProcessor.getPixelValue(x + 1, y - 1) == 128) {
                                 change = true;
-                                res.putPixelValue(x + 1, y - 1, 255);
+                                returnedProcessor.putPixelValue(x + 1, y - 1, 255);
                             }
                         }
                     }
@@ -376,14 +348,14 @@ public class HysteresisThresholdingOp extends Operator {
             }
         }
         // suppression
-        for (int x = 0; x < la; x++) {
-            for (int y = 0; y < ha; y++) {
-                if (res.getPixelValue(x, y) == 128) {
-                    res.putPixelValue(x, y, 0);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (returnedProcessor.getPixelValue(x, y) == 128) {
+                    returnedProcessor.putPixelValue(x, y, 0);
                 }
             }
         }
-        return res;
+        return returnedProcessor;
     }
 
     /**
@@ -423,5 +395,22 @@ public class HysteresisThresholdingOp extends Operator {
         }
 
         return new Rectangle(sx0, sy0, sw, sh);
+    }
+
+    /**
+     * The SPI is used to register this operator in the graph processing
+     * framework via the SPI configuration file
+     * {@code META-INF/services/org.esa.beam.framework.gpf.OperatorSpi}. This
+     * class may also serve as a factory for new operator instances.
+     *
+     * @see OperatorSpi#createOperator()
+     * @see OperatorSpi#createOperator(java.util.Map, java.util.Map)
+     */
+    public static class Spi extends OperatorSpi {
+
+        public Spi() {
+            super(HysteresisThresholdingOp.class);
+            setOperatorUI(HysteresisThresholdingOpUI.class);
+        }
     }
 }

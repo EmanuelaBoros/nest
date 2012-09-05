@@ -15,7 +15,6 @@
  */
 package org.esa.nest.image.processing.segmentation;
 
-import org.esa.nest.image.processing.morphology.*;
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
 import ij.process.ImageProcessor;
@@ -39,6 +38,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
+import org.openimaj.image.FImage;
 
 @OperatorMetadata(alias = "OtsuThresholding",
 category = "SAR Tools\\Image Processing",
@@ -238,22 +238,16 @@ public class OtsuThresholdingOp extends Operator {
 
         ImageProcessor roiImageProcessor = fullByteProcessor.crop();
 
-        int offset = 0;
-
-        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
-
-        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
-            offset = y * roiImageProcessor.getWidth();
-            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
-                int value = pixels[offset + x];
-                if ((pixels[offset + x] & 0xff) <= threshold){
-                    roiImageProcessor.putPixel(x, y, 0);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                float value = roiImageProcessor.getPixelValue(x, y);
+                if (value <= threshold) {
+                    roiImageProcessor.putPixelValue(x, y, 0);
                 } else {
-//                    roiImageProcessor.putPixel(x, y, 1);
+                    roiImageProcessor.putPixelValue(x, y, 255);
                 }
             }
         }
-
         final ProductData trgData = targetTile.getDataBuffer();
         final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
 
@@ -266,6 +260,97 @@ public class OtsuThresholdingOp extends Operator {
                         sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
+    }
+
+    /**
+     * Estimate the threshold for the given image. (OpenImaj)
+     *
+     * @param img the image
+     * @return the estimated threshold
+     */
+    public float calculateThreshold(ByteProcessor fullByteProcessor) {
+        if (!probabilityHistogramDone) {
+            int[] histogram = fullByteProcessor.getHistogram();
+            int length = histogram.length;
+            probabilityHistogram = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+            }
+            probabilityHistogramDone = true;
+        }
+
+        // Total number of pixels
+        int total = fullByteProcessor.getWidth() * fullByteProcessor.getHeight();
+
+        float sum = 0;
+        for (int t = 0; t < 256; t++) {
+            sum += t * probabilityHistogram[t];
+        }
+
+        float sumB = 0;
+        int wB = 0;
+        int wF = 0;
+
+        float varMax = 0;
+        float threshold = 0;
+
+        for (int t = 0; t < 256; t++) {
+            wB += probabilityHistogram[t];               // Weight Background
+            if (wB == 0) {
+                continue;
+            }
+
+            wF = total - wB;                 // Weight Foreground
+            if (wF == 0) {
+                break;
+            }
+
+            sumB += (t * probabilityHistogram[t]);
+
+            float mB = sumB / wB;            // Mean Background
+            float mF = (sum - sumB) / wF;    // Mean Foreground
+
+            // Calculate Between Class Variance
+            float varBetween = (float) wB * (float) wF * (mB - mF) * (mB - mF);
+
+            // Check if new maximum found
+            if (varBetween > varMax) {
+                varMax = varBetween;
+                threshold = t;
+            }
+        }
+
+        return threshold / 255;
+    }
+
+    /**
+     * Thresholding
+     *
+     * @param imageProcessor original image
+     * @param highThreshold high threshold
+     * @param lowThreshold low threshold
+     * @return "thresholded" image
+     */
+    ImageProcessor threshold(ImageProcessor imageProcessor, float threshold) {
+
+        int width = imageProcessor.getWidth();
+        int height = imageProcessor.getHeight();
+        ImageProcessor returnedProcessor = imageProcessor.duplicate();
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+
+                float value = returnedProcessor.getPixelValue(x, y);
+//0xFF &
+                if (value <= threshold) {
+                    returnedProcessor.putPixelValue(x, y, 0);
+                } else {
+                    returnedProcessor.putPixelValue(x, y, (byte) 255);
+                }
+            }
+        }
+        return returnedProcessor;
     }
 
     private class GrayLevel {

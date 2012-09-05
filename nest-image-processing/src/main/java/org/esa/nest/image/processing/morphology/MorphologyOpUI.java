@@ -39,7 +39,8 @@ public class MorphologyOpUI extends BaseOperatorUI {
     private final JTextField nIterations = new JTextField("");
 
     @Override
-    public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap, AppContext appContext) {
+    public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap,
+            AppContext appContext) {
 
         initializeOperatorUI(operatorName, parameterMap);
         final JComponent panel = createPanel();

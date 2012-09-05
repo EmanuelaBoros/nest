@@ -17,6 +17,7 @@ package org.esa.nest.image.processing.segmentation;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.gui.NewImage;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import java.awt.Rectangle;
@@ -42,8 +43,8 @@ category = "SAR Tools\\Image Processing",
 description = "MixtureModelingThresholding")
 public class MixtureModelingThresholdingOp extends Operator {
 
-    public static float[] probabilityHistogram;
-    private float threshold;
+    public static int[] probabilityHistogram;
+    private int threshold;
     final static int MAX_VALUE = 0;
     final static int MIN_VALUE = 256;
     private boolean probabilityHistogramDone;
@@ -194,7 +195,6 @@ public class MixtureModelingThresholdingOp extends Operator {
         int width = fullByteProcessor.getWidth();
         int height = fullByteProcessor.getHeight();
 
-        int intMax = (int) fullByteProcessor.getMax();
         N = width * height;
         probabilityHistogramDone = false;
 
@@ -203,8 +203,8 @@ public class MixtureModelingThresholdingOp extends Operator {
         int foundThreshold = 0;
 
         float error = 0;
-        float errorMin = 9999999;
-        float mu1 = 0, mu2 = 0, variance1 = 0, variance2 = 0;
+        float errorMin = Float.MAX_VALUE;
+        float mu1 = 0, mu2 = 0;
 
         while (classes.addToIndex()) {
             error = calculateError(classes);
@@ -212,9 +212,7 @@ public class MixtureModelingThresholdingOp extends Operator {
                 errorMin = error;
                 foundThreshold = classes.getThreshold();
                 mu1 = classes.getMu1();
-                variance1 = classes.getVariance1();
                 mu2 = classes.getMu2();
-                variance2 = classes.getVariance2();
             }
         }
         classes.setIndex(foundThreshold);
@@ -226,38 +224,37 @@ public class MixtureModelingThresholdingOp extends Operator {
         fullByteProcessor.setRoi(srcTileRectangle);
 
         ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+        ImagePlus imp = null;
+        imp = NewImage.createByteImage("Threshold", roiImageProcessor.getWidth(), 
+                roiImageProcessor.getHeight(), 1, NewImage.FILL_WHITE);
 
-        int offset = 0;
-
-        byte[] pixels = (byte[]) roiImageProcessor.getPixels();
-
-        for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
-            offset = y * roiImageProcessor.getWidth();
-            for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
-                int value = pixels[offset + x];
+        ImageProcessor nip = imp.getProcessor();
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                int value = roiImageProcessor.getPixel(x, y);
                 if (value > threshold) {
-                    roiImageProcessor.putPixel(x, y, intMax);
+                    nip.putPixel(x, y, 255);
                 } else {
-                    roiImageProcessor.putPixel(x, y, 0);
+                    nip.putPixel(x, y, 0);
                 }
             }
         }
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance((byte[]) nip.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
 
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
     }
 
-    private float findThreshold(int mu1, int mu2, GrayLevelClassMixtureModeling classes) {
+    private int findThreshold(int mu1, int mu2, GrayLevelClassMixtureModeling classes) {
 
         float min = Float.MAX_VALUE;
         int foundThreshold = 0;
@@ -279,7 +276,7 @@ public class MixtureModelingThresholdingOp extends Operator {
             error += Math.pow(classes.gamma(i) - classes.getHistogram(i), 2);
         }
 
-        return error / (classes.getMAX() + 1);
+        return (float) (error / (classes.getMAX() + 1));
     }
 
     private class GrayLevelClassMixtureModeling {
@@ -292,33 +289,26 @@ public class MixtureModelingThresholdingOp extends Operator {
         private float max1, max2;
         private int cardinal1, cardinal2;
         private int cardinal;
-        private int MIN_INDEX;// = 1;
-        private int MAX_INDEX;// = 253;
+        private int MIN_INDEX = 1;
+        private int MAX_INDEX = 253;
         private int MIN = 0;
-        private final int MAX;// = 255;
+        private final int MAX = 255;
 
         public GrayLevelClassMixtureModeling(ImageProcessor imageProcessor) {
-            
+
             cardinal = imageProcessor.getWidth() * imageProcessor.getHeight();
 
-            if (!probabilityHistogramDone) {
-                int[] histogram = imageProcessor.getHistogram();
-                int length = histogram.length;
-                probabilityHistogram = new float[length];
-
-                for (int i = 0; i < length; i++) {
-                    probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
-                }
-                probabilityHistogramDone = true;
-            }
-
-//            probabilityHistogram = imageProcessor.getHistogram();
-            
-            MAX = 255;//probabilityHistogram.length - 1;
-            
-            MAX_INDEX = (int) imageProcessor.getMax();
-            MIN_INDEX = (int) imageProcessor.getMin();
-            
+//            if (!probabilityHistogramDone) {
+//                int[] histogram = imageProcessor.getHistogram();
+//                int length = histogram.length;
+//                probabilityHistogram = new float[length];
+//
+//                for (int i = 0; i < length; i++) {
+//                    probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+//                }
+//                probabilityHistogramDone = true;
+//            }
+            probabilityHistogram = imageProcessor.getHistogram();
             index = MIN_INDEX - 1;
         }
 
@@ -333,7 +323,7 @@ public class MixtureModelingThresholdingOp extends Operator {
         }
 
         private float calculateMax(int index) {
-            
+
             float sum = probabilityHistogram[index];
             float num = 1;
             if (index - 1 >= 0) {
@@ -475,7 +465,7 @@ public class MixtureModelingThresholdingOp extends Operator {
             return gamma1(i) - gamma2(i);
         }
 
-        public float getHistogram(int i) {
+        public int getHistogram(int i) {
             return probabilityHistogram[i];
         }
 
