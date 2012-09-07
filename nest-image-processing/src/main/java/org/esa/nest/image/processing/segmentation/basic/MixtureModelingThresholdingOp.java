@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation;
+package org.esa.nest.image.processing.segmentation.basic;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
@@ -59,7 +59,7 @@ public class MixtureModelingThresholdingOp extends Operator {
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
-    private boolean processed = false;
+    private static boolean processed = false;
     private int halfSizeX;
     private int halfSizeY;
     private int filterSizeX = 3;
@@ -147,7 +147,7 @@ public class MixtureModelingThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOtsuThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeMixtureModelingThresholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -157,7 +157,7 @@ public class MixtureModelingThresholdingOp extends Operator {
     }
 
     /**
-     * Apply Otsu Thresholding
+     * Apply MixtureModelingThresholding
      *
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
@@ -169,11 +169,11 @@ public class MixtureModelingThresholdingOp extends Operator {
      * @param w Width for the target_Tile_Rectangle.
      * @param h Hight for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
+     * computation cancellation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeOtsuThesholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeMixtureModelingThresholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -225,7 +225,7 @@ public class MixtureModelingThresholdingOp extends Operator {
 
         ImageProcessor roiImageProcessor = fullByteProcessor.crop();
         ImagePlus imp = null;
-        imp = NewImage.createByteImage("Threshold", roiImageProcessor.getWidth(), 
+        imp = NewImage.createByteImage("Threshold", roiImageProcessor.getWidth(),
                 roiImageProcessor.getHeight(), 1, NewImage.FILL_WHITE);
 
         ImageProcessor nip = imp.getProcessor();

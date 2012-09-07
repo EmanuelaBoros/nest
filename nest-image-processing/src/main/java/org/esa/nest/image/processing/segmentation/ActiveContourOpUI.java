@@ -25,12 +25,17 @@ import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
-public class OtsuThresholdingOpUI extends BaseOperatorUI {
+public class ActiveContourOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
+    private final JLabel highThresholdLabel = new JLabel("HighThreshold");
+    private final JTextField highThreshold = new JTextField("");
+    private final JLabel lowThresholdLabel = new JLabel("LowThreshold");
+    private final JTextField lowThreshold = new JTextField("");
 
     @Override
-    public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap, AppContext appContext) {
+    public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap,
+            AppContext appContext) {
 
         initializeOperatorUI(operatorName, parameterMap);
         final JComponent panel = createPanel();
@@ -42,17 +47,21 @@ public class OtsuThresholdingOpUI extends BaseOperatorUI {
     @Override
     public void initParameters() {
         OperatorUIUtils.initBandList(bandList, getBandNames());
+        highThreshold.setText(String.valueOf(paramMap.get("highThreshold")));
+        lowThreshold.setText(String.valueOf(paramMap.get("lowThreshold")));
     }
 
     @Override
     public UIValidation validateParameters() {
-
         return new UIValidation(UIValidation.State.OK, "");
     }
 
     @Override
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
+
+        paramMap.put("highThreshold", Float.parseFloat(highThreshold.getText()));
+        paramMap.put("lowThreshold", Float.parseFloat(lowThreshold.getText()));
     }
 
     private JComponent createPanel() {
@@ -62,12 +71,18 @@ public class OtsuThresholdingOpUI extends BaseOperatorUI {
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
         gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, highThresholdLabel, highThreshold);
         gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, lowThresholdLabel, lowThreshold);
         final int savedY = gbc.gridy;
         gbc.gridy++;
         gbc.gridy = savedY;
         gbc.weightx = 1.0;
+
         contentPane.add(new JPanel(), gbc);
+
+        DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, true);
+        DialogUtils.enableComponents(highThresholdLabel, highThreshold, true);
         return contentPane;
     }
 }

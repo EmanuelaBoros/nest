@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.morphology;
+package org.esa.nest.image.processing.segmentation.basic;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
@@ -39,14 +39,14 @@ import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Morphology Operators: Dilate, Erode, Open, Close
- */
-@OperatorMetadata(alias = "MorphologyOperator",
-category = "SAR Tools\\Morphology Operators",
-description = "Dilate, Erode, Open, Close")
-public class MorphologyOp extends Operator {
+@OperatorMetadata(alias = "OtsuThresholding",
+category = "SAR Tools\\Image Processing",
+description = "OtsuThresholdingOp")
+public class OtsuThresholdingOp extends Operator {
 
+    private static float[] probabilityHistogram;
+    public static boolean probabilityHistogramDone;
+    public static int N;
     @SourceProduct(alias = "source")
     private Product sourceProduct = null;
     @TargetProduct
@@ -54,16 +54,6 @@ public class MorphologyOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(valueSet = {DILATE_OPERATOR, ERODE_OPERATOR, OPEN_OPERATOR,
-        CLOSE_OPERATOR}, defaultValue = DILATE_OPERATOR,
-    label = "Operator")
-    private String operator;
-    @Parameter(description = "Iterations", interval = "[1, 100]", defaultValue = "1", label = "Iterations")
-    private int nIterations = 1;
-    static final String DILATE_OPERATOR = "Dilate";
-    static final String ERODE_OPERATOR = "Erode";
-    static final String OPEN_OPERATOR = "Open";
-    static final String CLOSE_OPERATOR = "Close";
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
@@ -78,24 +68,7 @@ public class MorphologyOp extends Operator {
      * Default constructor. The graph processing framework requires that an
      * operator has a default constructor.
      */
-    public MorphologyOp() {
-    }
-
-    /**
-     * Set the morphology operator. This function is used by unit test only.
-     *
-     * @param s The filter name.
-     */
-    public void SetOperator(String s) {
-
-        if (s.equals(DILATE_OPERATOR)
-                || s.equals(ERODE_OPERATOR)
-                || s.equals(OPEN_OPERATOR)
-                || s.equals(CLOSE_OPERATOR)) {
-            operator = s;
-        } else {
-            throw new OperatorException(s + " is an invalid filter name.");
-        }
+    public OtsuThresholdingOp() {
     }
 
     /**
@@ -156,7 +129,7 @@ public class MorphologyOp extends Operator {
      * @param targetTile The current tile associated with the target band to be
      * computed.
      * @param pm A progress monitor which should be used to determine
-     * computation cancellation requests.
+     * computation cancelation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the target raster.
      */
@@ -179,12 +152,290 @@ public class MorphologyOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOperator(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeOtsuThresholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
         } finally {
             pm.done();
+        }
+    }
+
+    /**
+     * Apply Otsu Thresholding
+     *
+     * @param sourceRaster The source tile for the band.
+     * @param targetTile The current tile associated with the target band to be
+     * computed.
+     * @param x0 X coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param y0 Y coordinate for the upper-left point of the
+     * target_Tile_Rectangle.
+     * @param w Width for the target_Tile_Rectangle.
+     * @param h Hight for the target_Tile_Rectangle.
+     * @param pm A progress monitor which should be used to determine
+     * computation cancellation requests.
+     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
+     * during computation of the filtered value.
+     */
+    private synchronized void computeOtsuThresholding(final Band sourceBand, final Tile sourceRaster,
+            final Tile targetTile, final int x0, final int y0, final int w, final int h,
+            final ProgressMonitor pm) {
+
+        if (!processed) {
+            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
+            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+                    sourceBand.getSceneRasterHeight(),
+                    BufferedImage.TYPE_USHORT_GRAY);
+            fullBufferedImage.setData(fullRenderedImage.getData());
+
+            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+            processed = true;
+        }
+
+        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+
+        int width = fullByteProcessor.getWidth();
+        int height = fullByteProcessor.getHeight();
+
+        int intMax = (int) fullByteProcessor.getMax();
+
+        N = width * height;
+        probabilityHistogramDone = false;
+
+        GrayLevel grayLevelTrue =
+                new GrayLevel(fullByteProcessor, true);
+        GrayLevel grayLevelFalse =
+                new GrayLevel(fullByteProcessor, false);
+
+        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
+                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
+
+        double sigmaMax = 0d;
+        float threshold = 0f;
+
+        for (int i = 0; i < intMax; i++) {
+
+            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
+                    + (double) grayLevelFalse.getOmega()
+                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
+
+            if (sigma > sigmaMax) {
+                sigmaMax = sigma;
+                threshold = grayLevelTrue.getThreshold();
+            }
+
+            grayLevelTrue.addToEnd();
+            grayLevelFalse.removeFromBeginning();
+        }
+
+        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
+
+        fullByteProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                float value = roiImageProcessor.getPixelValue(x, y);
+                if (value <= threshold) {
+                    roiImageProcessor.putPixelValue(x, y, 0);
+                } else {
+                    roiImageProcessor.putPixelValue(x, y, 255);
+                }
+            }
+        }
+        final ProductData trgData = targetTile.getDataBuffer();
+        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+
+        final int maxY = y0 + h;
+        final int maxX = x0 + w;
+        for (int y = y0; y < maxY; ++y) {
+            for (int x = x0; x < maxX; ++x) {
+
+                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+            }
+        }
+    }
+
+    /**
+     * Estimate the threshold for the given image. (OpenImaj)
+     *
+     * @param img the image
+     * @return the estimated threshold
+     */
+    public float calculateThreshold(ByteProcessor fullByteProcessor) {
+        if (!probabilityHistogramDone) {
+            int[] histogram = fullByteProcessor.getHistogram();
+            int length = histogram.length;
+            probabilityHistogram = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+            }
+            probabilityHistogramDone = true;
+        }
+
+        // Total number of pixels
+        int total = fullByteProcessor.getWidth() * fullByteProcessor.getHeight();
+
+        float sum = 0;
+        for (int t = 0; t < 256; t++) {
+            sum += t * probabilityHistogram[t];
+        }
+
+        float sumB = 0;
+        int wB = 0;
+        int wF = 0;
+
+        float varMax = 0;
+        float threshold = 0;
+
+        for (int t = 0; t < 256; t++) {
+            wB += probabilityHistogram[t];               // Weight Background
+            if (wB == 0) {
+                continue;
+            }
+
+            wF = total - wB;                 // Weight Foreground
+            if (wF == 0) {
+                break;
+            }
+
+            sumB += (t * probabilityHistogram[t]);
+
+            float mB = sumB / wB;            // Mean Background
+            float mF = (sum - sumB) / wF;    // Mean Foreground
+
+            // Calculate Between Class Variance
+            float varBetween = (float) wB * (float) wF * (mB - mF) * (mB - mF);
+
+            // Check if new maximum found
+            if (varBetween > varMax) {
+                varMax = varBetween;
+                threshold = t;
+            }
+        }
+
+        return threshold / 255;
+    }
+
+    /**
+     * Thresholding
+     *
+     * @param imageProcessor original image
+     * @param highThreshold high threshold
+     * @param lowThreshold low threshold
+     * @return "thresholded" image
+     */
+    ImageProcessor threshold(ImageProcessor imageProcessor, float threshold) {
+
+        int width = imageProcessor.getWidth();
+        int height = imageProcessor.getHeight();
+        ImageProcessor returnedProcessor = imageProcessor.duplicate();
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+
+                float value = returnedProcessor.getPixelValue(x, y);
+//0xFF &
+                if (value <= threshold) {
+                    returnedProcessor.putPixelValue(x, y, 0);
+                } else {
+                    returnedProcessor.putPixelValue(x, y, (byte) 255);
+                }
+            }
+        }
+        return returnedProcessor;
+    }
+
+    private class GrayLevel {
+
+        private int index;
+        private float omega;
+        private float mu;
+
+        public GrayLevel(ImageProcessor imageProcessor, boolean isFirst) {
+
+            if (!probabilityHistogramDone) {
+                int[] histogram = imageProcessor.getHistogram();
+                int length = histogram.length;
+                probabilityHistogram = new float[length];
+
+                for (int i = 0; i < length; i++) {
+                    probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+                }
+                probabilityHistogramDone = true;
+            }
+
+            if (isFirst) {
+                index = 1;
+                omega = probabilityHistogram[index - 1];
+                if (omega == 0) {
+                    mu = 0;
+                } else {
+                    mu = 1 * probabilityHistogram[index - 1] / omega;
+                }
+            } else {
+                index = 2;
+                omega = 0;
+                mu = 0;
+                for (int i = index; i < probabilityHistogram.length; i++) {
+                    omega += probabilityHistogram[i - 1];
+                    mu += probabilityHistogram[i - 1] * i;
+                }
+                if (omega == 0) {
+                    mu = 0;
+                } else {
+                    mu /= omega;
+                }
+            }
+        }
+
+        public void removeFromBeginning() {
+            index++;
+            mu = 0;
+            omega = 0;
+
+            for (int i = index; i < probabilityHistogram.length; i++) {
+                omega += probabilityHistogram[i - 1];
+                mu += i * probabilityHistogram[i - 1];//i*
+            }
+            if (omega == 0) {
+                mu = 0;
+            } else {
+                mu /= omega;
+            }
+        }
+
+        public void addToEnd() {
+            index++;
+            mu = 0;
+            omega = 0;
+            for (int i = 1; i < index; i++) {
+                omega += probabilityHistogram[i - 1];
+                mu += i * probabilityHistogram[i - 1];
+            }
+            if (omega == 0) {
+                mu = 0;
+            } else {
+                mu /= omega;
+            }
+        }
+
+        public float getMu() {
+            return mu;
+        }
+
+        public float getOmega() {
+            return omega;
+        }
+
+        public int getThreshold() {
+            return index;
         }
     }
 
@@ -228,75 +479,6 @@ public class MorphologyOp extends Operator {
     }
 
     /**
-     * Apply the selected morphology operator
-     *
-     * @param sourceRaster The source tile for the band.
-     * @param targetTile The current tile associated with the target band to be
-     * computed.
-     * @param x0 X coordinate for the upper-left point of the
-     * target_Tile_Rectangle.
-     * @param y0 Y coordinate for the upper-left point of the
-     * target_Tile_Rectangle.
-     * @param w Width for the target_Tile_Rectangle.
-     * @param h Hight for the target_Tile_Rectangle.
-     * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
-     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
-     * during computation of the filtered value.
-     */
-    private synchronized void computeOperator(final Band sourceBand, final Tile sourceRaster,
-            final Tile targetTile, final int x0, final int y0, final int w, final int h,
-            final ProgressMonitor pm) {
-
-        if (!processed) {
-            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
-                    sourceBand.getSceneRasterHeight(),
-                    BufferedImage.TYPE_USHORT_GRAY);
-            fullBufferedImage.setData(fullRenderedImage.getData());
-
-            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-            processed = true;
-        }
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-
-        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
-
-        fullByteProcessor.setRoi(srcTileRectangle);
-
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
-
-        for (int i = 0; i < nIterations; i++) {
-            if (operator.equals(DILATE_OPERATOR)) {
-                roiImageProcessor.dilate();
-            } else if (operator.equals(ERODE_OPERATOR)) {
-                roiImageProcessor.erode();
-            } else if (operator.equals(CLOSE_OPERATOR)) {
-                roiImageProcessor.dilate();
-                roiImageProcessor.erode();
-            } else if (operator.equals(OPEN_OPERATOR)) {
-                roiImageProcessor.erode();
-                roiImageProcessor.dilate();
-            }
-        }
-
-        final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
-
-        final int maxY = y0 + h;
-        final int maxX = x0 + w;
-        for (int y = y0; y < maxY; ++y) {
-            for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
-            }
-        }
-    }
-
-    /**
      * The SPI is used to register this operator in the graph processing
      * framework via the SPI configuration file
      * {@code META-INF/services/org.esa.beam.framework.gpf.OperatorSpi}. This
@@ -308,8 +490,8 @@ public class MorphologyOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(MorphologyOp.class);
-            setOperatorUI(MorphologyOpUI.class);
+            super(OtsuThresholdingOp.class);
+            setOperatorUI(OtsuThresholdingOpUI.class);
         }
     }
 }

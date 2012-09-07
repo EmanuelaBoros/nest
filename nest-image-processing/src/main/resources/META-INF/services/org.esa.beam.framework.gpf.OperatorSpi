@@ -2,3 +2,4 @@ org.esa.nest.image.processing.morphology.MorphologyOp$Spi
 org.esa.nest.image.processing.segmentation.OtsuThresholdingOp$Spi
 org.esa.nest.image.processing.segmentation.MixtureModelingThresholdingOp$Spi
 org.esa.nest.image.processing.segmentation.HysteresisThresholdingOp$Spi
+org.esa.nest.image.processing.segmentation.ActiveContourOp$Spi

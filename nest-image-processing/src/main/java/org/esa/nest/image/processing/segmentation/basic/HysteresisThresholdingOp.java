@@ -13,14 +13,18 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation;
+package org.esa.nest.image.processing.segmentation.basic;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
-import ij.process.ImageProcessor;
-import org.esa.beam.framework.datamodel.Band;
 import ij.process.ByteProcessor;
-
+import ij.process.ImageProcessor;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.awt.image.RenderedImage;
+import java.util.HashMap;
+import java.util.Map;
+import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.framework.gpf.Operator;
@@ -33,20 +37,14 @@ import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
-import java.util.HashMap;
-import java.util.Map;
-import org.openimaj.image.FImage;
-
-@OperatorMetadata(alias = "OtsuThresholding",
+@OperatorMetadata(alias = "HysteresisThresholding",
 category = "SAR Tools\\Image Processing",
-description = "OtsuThresholdingOp")
-public class OtsuThresholdingOp extends Operator {
+description = "HysteresisThresholding")
+public class HysteresisThresholdingOp extends Operator {
 
-    private static float[] probabilityHistogram;
-    public static boolean probabilityHistogramDone;
+    public static float[] probabilityHistogram;
+    final static int MAX_VALUE = 0;
+    final static int MIN_VALUE = 256;
     public static int N;
     @SourceProduct(alias = "source")
     private Product sourceProduct = null;
@@ -55,6 +53,10 @@ public class OtsuThresholdingOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
+    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
+    private float highThreshold = 100f;
+    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
+    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
@@ -64,13 +66,7 @@ public class OtsuThresholdingOp extends Operator {
     private int filterSizeX = 3;
     private int filterSizeY = 3;
     private static ImagePlus fullImagePlus;
-
-    /**
-     * Default constructor. The graph processing framework requires that an
-     * operator has a default constructor.
-     */
-    public OtsuThresholdingOp() {
-    }
+    private static ByteProcessor fullByteProcessor;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -153,7 +149,7 @@ public class OtsuThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeOtsuThresholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -163,7 +159,7 @@ public class OtsuThresholdingOp extends Operator {
     }
 
     /**
-     * Apply Otsu Thresholding
+     * Apply HysteresisThesholding
      *
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
@@ -175,11 +171,11 @@ public class OtsuThresholdingOp extends Operator {
      * @param w Width for the target_Tile_Rectangle.
      * @param h Hight for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
-     * computation cancellation requests.
+     * computation cancelation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeOtsuThresholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -191,63 +187,24 @@ public class OtsuThresholdingOp extends Operator {
             fullBufferedImage.setData(fullRenderedImage.getData());
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+
+            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
+            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
+
             processed = true;
-        }
-
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-
-        int width = fullByteProcessor.getWidth();
-        int height = fullByteProcessor.getHeight();
-
-        int intMax = (int) fullByteProcessor.getMax();
-
-        N = width * height;
-        probabilityHistogramDone = false;
-
-        GrayLevel grayLevelTrue =
-                new GrayLevel(fullByteProcessor, true);
-        GrayLevel grayLevelFalse =
-                new GrayLevel(fullByteProcessor, false);
-
-        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
-                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
-
-        double sigmaMax = 0d;
-        float threshold = 0f;
-
-        for (int i = 0; i < intMax; i++) {
-
-            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
-                    + (double) grayLevelFalse.getOmega()
-                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
-
-            if (sigma > sigmaMax) {
-                sigmaMax = sigma;
-                threshold = grayLevelTrue.getThreshold();
-            }
-
-            grayLevelTrue.addToEnd();
-            grayLevelFalse.removeFromBeginning();
         }
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        fullByteProcessor.setRoi(srcTileRectangle);
+        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
 
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+        aPartProcessor.setRoi(srcTileRectangle);
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                float value = roiImageProcessor.getPixelValue(x, y);
-                if (value <= threshold) {
-                    roiImageProcessor.putPixelValue(x, y, 0);
-                } else {
-                    roiImageProcessor.putPixelValue(x, y, 255);
-                }
-            }
-        }
+        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+
         final ProductData trgData = targetTile.getDataBuffer();
         final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
 
@@ -256,83 +213,22 @@ public class OtsuThresholdingOp extends Operator {
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
 
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
     }
 
     /**
-     * Estimate the threshold for the given image. (OpenImaj)
-     *
-     * @param img the image
-     * @return the estimated threshold
-     */
-    public float calculateThreshold(ByteProcessor fullByteProcessor) {
-        if (!probabilityHistogramDone) {
-            int[] histogram = fullByteProcessor.getHistogram();
-            int length = histogram.length;
-            probabilityHistogram = new float[length];
-
-            for (int i = 0; i < length; i++) {
-                probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
-            }
-            probabilityHistogramDone = true;
-        }
-
-        // Total number of pixels
-        int total = fullByteProcessor.getWidth() * fullByteProcessor.getHeight();
-
-        float sum = 0;
-        for (int t = 0; t < 256; t++) {
-            sum += t * probabilityHistogram[t];
-        }
-
-        float sumB = 0;
-        int wB = 0;
-        int wF = 0;
-
-        float varMax = 0;
-        float threshold = 0;
-
-        for (int t = 0; t < 256; t++) {
-            wB += probabilityHistogram[t];               // Weight Background
-            if (wB == 0) {
-                continue;
-            }
-
-            wF = total - wB;                 // Weight Foreground
-            if (wF == 0) {
-                break;
-            }
-
-            sumB += (t * probabilityHistogram[t]);
-
-            float mB = sumB / wB;            // Mean Background
-            float mF = (sum - sumB) / wF;    // Mean Foreground
-
-            // Calculate Between Class Variance
-            float varBetween = (float) wB * (float) wF * (mB - mF) * (mB - mF);
-
-            // Check if new maximum found
-            if (varBetween > varMax) {
-                varMax = varBetween;
-                threshold = t;
-            }
-        }
-
-        return threshold / 255;
-    }
-
-    /**
-     * Thresholding
+     * Double thresholding
      *
      * @param imageProcessor original image
      * @param highThreshold high threshold
      * @param lowThreshold low threshold
-     * @return "thresholded" image
+     * @return "trinarised" image
      */
-    ImageProcessor threshold(ImageProcessor imageProcessor, float threshold) {
+    ImageProcessor trinarise(ByteProcessor imageProcessor, float highThreshold,
+            float lowThreshold) {
 
         int width = imageProcessor.getWidth();
         int height = imageProcessor.getHeight();
@@ -342,102 +238,121 @@ public class OtsuThresholdingOp extends Operator {
             for (int y = 0; y < height; y++) {
 
                 float value = returnedProcessor.getPixelValue(x, y);
-//0xFF &
-                if (value <= threshold) {
-                    returnedProcessor.putPixelValue(x, y, 0);
-                } else {
-                    returnedProcessor.putPixelValue(x, y, (byte) 255);
+
+                if (value >= highThreshold) {
+                    returnedProcessor.putPixel(x, y, 255);
+                } else if (value >= lowThreshold) {
+                    returnedProcessor.putPixel(x, y, 128);
                 }
             }
         }
         return returnedProcessor;
     }
 
-    private class GrayLevel {
+    /**
+     * Hysteresis thresholding
+     *
+     * @param imageProcessor original image
+     * @return thresholded image
+     */
+    ImageProcessor hysteresisThresholding(ByteProcessor imageProcessor) {
 
-        private int index;
-        private float omega;
-        private float mu;
+        int width = imageProcessor.getWidth();
+        int height = imageProcessor.getHeight();
 
-        public GrayLevel(ImageProcessor imageProcessor, boolean isFirst) {
+        ImageProcessor returnedProcessor = imageProcessor.duplicate();
+        boolean change = true;
 
-            if (!probabilityHistogramDone) {
-                int[] histogram = imageProcessor.getHistogram();
-                int length = histogram.length;
-                probabilityHistogram = new float[length];
-
-                for (int i = 0; i < length; i++) {
-                    probabilityHistogram[i] = ((float) histogram[i]) / ((float) N);
+        while (change) {
+            change = false;
+            for (int x = 1; x < width - 1; x++) {
+                for (int y = 1; y < height - 1; y++) {
+                    if (returnedProcessor.getPixelValue(x, y) == 255) {
+                        if (returnedProcessor.getPixelValue(x + 1, y) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x + 1, y, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x - 1, y) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x - 1, y, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x, y + 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x, y + 1, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x, y - 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x, y - 1, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x + 1, y + 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x + 1, y + 1, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x - 1, y - 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x - 1, y - 1, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x - 1, y + 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x - 1, y + 1, 255);
+                        }
+                        if (returnedProcessor.getPixelValue(x + 1, y - 1) == 128) {
+                            change = true;
+                            returnedProcessor.putPixelValue(x + 1, y - 1, 255);
+                        }
+                    }
                 }
-                probabilityHistogramDone = true;
             }
-
-            if (isFirst) {
-                index = 1;
-                omega = probabilityHistogram[index - 1];
-                if (omega == 0) {
-                    mu = 0;
-                } else {
-                    mu = 1 * probabilityHistogram[index - 1] / omega;
+            if (change) {
+                for (int x = width - 2; x > 0; x--) {
+                    for (int y = height - 2; y > 0; y--) {
+                        if (returnedProcessor.getPixelValue(x, y) == 255) {
+                            if (returnedProcessor.getPixelValue(x + 1, y) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x + 1, y, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x - 1, y) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x - 1, y, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x, y + 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x, y + 1, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x, y - 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x, y - 1, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x + 1, y + 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x + 1, y + 1, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x - 1, y - 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x - 1, y - 1, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x - 1, y + 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x - 1, y + 1, 255);
+                            }
+                            if (returnedProcessor.getPixelValue(x + 1, y - 1) == 128) {
+                                change = true;
+                                returnedProcessor.putPixelValue(x + 1, y - 1, 255);
+                            }
+                        }
+                    }
                 }
-            } else {
-                index = 2;
-                omega = 0;
-                mu = 0;
-                for (int i = index; i < probabilityHistogram.length; i++) {
-                    omega += probabilityHistogram[i - 1];
-                    mu += probabilityHistogram[i - 1] * i;
-                }
-                if (omega == 0) {
-                    mu = 0;
-                } else {
-                    mu /= omega;
+            }
+        }
+        // suppression
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (returnedProcessor.getPixelValue(x, y) == 128) {
+                    returnedProcessor.putPixelValue(x, y, 0);
                 }
             }
         }
-
-        public void removeFromBeginning() {
-            index++;
-            mu = 0;
-            omega = 0;
-
-            for (int i = index; i < probabilityHistogram.length; i++) {
-                omega += probabilityHistogram[i - 1];
-                mu += i * probabilityHistogram[i - 1];//i*
-            }
-            if (omega == 0) {
-                mu = 0;
-            } else {
-                mu /= omega;
-            }
-        }
-
-        public void addToEnd() {
-            index++;
-            mu = 0;
-            omega = 0;
-            for (int i = 1; i < index; i++) {
-                omega += probabilityHistogram[i - 1];
-                mu += i * probabilityHistogram[i - 1];
-            }
-            if (omega == 0) {
-                mu = 0;
-            } else {
-                mu /= omega;
-            }
-        }
-
-        public float getMu() {
-            return mu;
-        }
-
-        public float getOmega() {
-            return omega;
-        }
-
-        public int getThreshold() {
-            return index;
-        }
+        return returnedProcessor;
     }
 
     /**
@@ -491,8 +406,8 @@ public class OtsuThresholdingOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(OtsuThresholdingOp.class);
-            setOperatorUI(OtsuThresholdingOpUI.class);
+            super(HysteresisThresholdingOp.class);
+            setOperatorUI(HysteresisThresholdingOpUI.class);
         }
     }
 }

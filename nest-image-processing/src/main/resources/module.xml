@@ -87,7 +87,20 @@
             <text>Hysteresis Thresholding</text>
             <operatorName>HysteresisThresholding</operatorName>
             <dialogTitle>Hysteresis Thresholding</dialogTitle>
-            <shortDescr>Invoke Hysteresis Thresholding Thresholding on a single product</shortDescr>
+            <shortDescr>Invoke Hysteresis Thresholding on a single product</shortDescr>
+            <targetProductNameSuffix>_Hys</targetProductNameSuffix>
+        </action>
+        
+        <action>
+            <id>ActiveContourOp</id>
+            <helpId>ActiveContourOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>Active Contour</text>
+            <operatorName>ActiveContour</operatorName>
+            <dialogTitle>Active Contour</dialogTitle>
+            <shortDescr>Invoke Active Contour on a single product</shortDescr>
             <targetProductNameSuffix>_Hys</targetProductNameSuffix>
         </action>
     </extension>

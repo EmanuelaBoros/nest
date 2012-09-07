@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation;
+package org.esa.nest.image.processing.segmentation.basic;
 
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -26,9 +26,6 @@ import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
-@OperatorMetadata(alias = "HysteresisThresholding",
-category = "SAR Tools\\Image Processing",
-description = "HysteresisThresholding")
 public class HysteresisThresholdingOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();

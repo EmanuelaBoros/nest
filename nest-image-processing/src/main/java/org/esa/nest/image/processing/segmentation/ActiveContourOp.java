@@ -16,17 +16,21 @@
 package org.esa.nest.image.processing.segmentation;
 
 import com.bc.ceres.core.ProgressMonitor;
+import ij.IJ;
 import ij.ImagePlus;
-import ij.ImageStack;
+import ij.Prefs;
+import ij.gui.GenericDialog;
 import ij.gui.Roi;
+import ij.io.FileSaver;
+import ij.plugin.frame.RoiManager;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
+import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
-import javax.swing.JOptionPane;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
@@ -39,11 +43,13 @@ import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
+import org.esa.nest.image.processing.utils.SnakeConfig;
+import org.esa.nest.image.processing.utils.SnakeConfigDriver;
 
-@OperatorMetadata(alias = "HysteresisThresholding",
+@OperatorMetadata(alias = "ActiveContour",
 category = "SAR Tools\\Image Processing",
-description = "HysteresisThresholding")
-public class HysteresisThresholdingOp extends Operator {
+description = "ActiveContour")
+public class ActiveContourOp extends Operator {
 
     public static float[] probabilityHistogram;
     final static int MAX_VALUE = 0;
@@ -63,13 +69,45 @@ public class HysteresisThresholdingOp extends Operator {
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
-    private boolean processed = false;
+    private static boolean processed = false;
     private int halfSizeX;
     private int halfSizeY;
     private int filterSizeX = 3;
     private int filterSizeY = 3;
     private static ImagePlus fullImagePlus;
     private static ByteProcessor fullByteProcessor;
+    /**
+     *
+     */
+    Roi originalROI = null;
+    Color colorDraw = Color.white;
+    /**
+     *
+     */
+    SnakeConfigDriver configDriver;
+    @Parameter(description = "Number of Iterations", defaultValue = "100", label = "nIterations")
+    int nIterations = 50;
+    // step to display snake
+    int step = 1;
+    // threshold of edges
+    @Parameter(description = "Gradient threshold", defaultValue = "100", label = "GradientThreshold")
+    private int gradientThreshold = 5;
+    // how far to look for edges
+    int DistMAX = Prefs.getInt("ABSnake_DistSearch.int", 100);
+    // maximum displacement
+    double force = 5.0;
+    // regularization factors, min and max
+    double dRegularization = 5.0;
+    double dMinRegularization, dMaxRegularization;
+    // first and last slice to process
+    int slice1, slice2;
+    // misc options
+    boolean showgrad = false;
+    boolean savecoords = false;
+    boolean createsegimage = false;
+    boolean advanced = false;
+    boolean propagate = true;
+    boolean movie = false;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -82,7 +120,7 @@ public class HysteresisThresholdingOp extends Operator {
      * be placed here.</p>
      *
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
-     * during operator initialisation.
+     * during operator initialization.
      * @see #getTargetProduct()
      */
     @Override
@@ -152,7 +190,7 @@ public class HysteresisThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            initializeActiveContoursProcessing(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -174,11 +212,11 @@ public class HysteresisThresholdingOp extends Operator {
      * @param w Width for the target_Tile_Rectangle.
      * @param h Hight for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
+     * computation cancellation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void initializeActiveContoursProcessing(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -194,19 +232,47 @@ public class HysteresisThresholdingOp extends Operator {
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
             fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
-            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
+
+            showDialog();
+
+            RoiManager roiManager = RoiManager.getInstance();
+
+            if (roiManager == null) {
+                roiManager = new RoiManager();
+                roiManager.setVisible(true);
+                originalROI = fullImagePlus.getRoi();
+                if (originalROI == null) {
+                    IJ.showMessage("Roi required");
+                } else {
+                    roiManager.add(fullImagePlus, originalROI, 0);
+                }
+            }
 
             processed = true;
         }
+        configDriver = new SnakeConfigDriver();
+        setAdvancedParameters();
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
+        Roi currentROI = new Roi(sourceRaster.getRectangle());
 
         ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
 
         aPartProcessor.setRoi(srcTileRectangle);
 
         ImageProcessor roiImageProcessor = aPartProcessor.crop();
+
+        configDriver = new SnakeConfigDriver();
+        setAdvancedParameters();
+
+        dMinRegularization = dRegularization / 2.0;
+        dMaxRegularization = dRegularization;
+
+        ActiveContour currentActivecontour = processActiveContour(fullImagePlus,
+                currentROI, roiImageProcessor, w,
+                x0 + "," + y0);
+
+        currentActivecontour.drawContour(aPartProcessor, colorDraw, 2);
 
         final ProductData trgData = targetTile.getDataBuffer();
         final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
@@ -220,6 +286,308 @@ public class HysteresisThresholdingOp extends Operator {
                         sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
+    }
+
+    private boolean showDialog() {
+        String[] colors = {"Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "Black", "White"};
+        int indexcol = 0;
+        GenericDialog gd = new GenericDialog("Snake");
+        gd.addNumericField("Gradient_threshold:", gradientThreshold, 0);
+        gd.addNumericField("Number_of_iterations:", nIterations, 0);
+        gd.addNumericField("Step_result_show:", step, 0);
+        //if (profondeur == 1) {
+        gd.addCheckbox("Save intermediate images", movie);
+        //}
+//        if (profondeur > 1) {
+//            gd.addNumericField("First_slice:", slice1, 0);
+//            gd.addNumericField("Last_slice:", slice2, 0);
+//            gd.addCheckbox("Propagate roi", propagate);
+//        }
+        gd.addChoice("Draw_color:", colors, colors[indexcol]);
+        gd.addCheckbox("Save_coords", savecoords);
+        gd.addCheckbox("Create_seg_image", createsegimage);
+        //gd.addCheckbox("Advanced_options", advanced);
+        // show dialog
+        gd.showDialog();
+
+        // threshold of edge
+        gradientThreshold = (int) gd.getNextNumber();
+
+        // number of iterations
+        nIterations = (int) gd.getNextNumber();
+        // step of display
+        step = (int) gd.getNextNumber();
+        //if (profondeur == 1) {
+        movie = gd.getNextBoolean();
+        //}
+        if (step > nIterations - 1) {
+            IJ.showStatus("Warning : show step too big\n\t step assignation 1");
+            step = 1;
+        }
+//        if (profondeur > 1) {
+//            slice1 = (int) gd.getNextNumber();
+//            slice2 = (int) gd.getNextNumber();
+//            propagate = gd.getNextBoolean();
+//        }
+        // color choice of display
+        indexcol = gd.getNextChoiceIndex();
+        switch (indexcol) {
+            case 0:
+                colorDraw = Color.red;
+                break;
+            case 1:
+                colorDraw = Color.green;
+                break;
+            case 2:
+                colorDraw = Color.blue;
+                break;
+            case 3:
+                colorDraw = Color.cyan;
+                break;
+            case 4:
+                colorDraw = Color.magenta;
+                break;
+            case 5:
+                colorDraw = Color.yellow;
+                break;
+            case 6:
+                colorDraw = Color.black;
+                break;
+            case 7:
+                colorDraw = Color.white;
+                break;
+            default:
+                colorDraw = Color.yellow;
+        }
+        savecoords = gd.getNextBoolean();
+        createsegimage = gd.getNextBoolean();
+        //advanced = gd.getNextBoolean();
+
+        return !gd.wasCanceled();
+    }
+
+    /**
+     * Main processing method for the Snake_deriche_ object
+     *
+     * @param imageProcessor image
+     */
+//    public void letOffActiveContours() {
+//
+//        stack = fullImagePlus.getStack();
+//
+//        stackSize = stack.getSize();
+//        stackWidth = stack.getWidth();
+//        stackHeight = stack.getHeight();
+//
+//        slice1 = 1;
+//        slice2 = stackSize;
+//
+//        RoiManager roiManager = RoiManager.getInstance();
+//        if (roiManager == null) {
+//            roiManager = new RoiManager();
+//            roiManager.setVisible(true);
+//            originalROI = fullImagePlus.getRoi();
+//            if (originalROI == null) {
+//                IJ.showMessage("Roi required");
+//            } else {
+//                roiManager.add(fullImagePlus, originalROI, 0);
+//            }
+//        }
+//
+//        nROI = roiManager.getCount();
+//
+//        final Roi[] originalROIs = roiManager.getRoisAsArray();
+//        final Roi[] currentROIs = new Roi[nROI];
+//
+//        Roi[] RoisResult = new Roi[nROI];
+//
+//        System.arraycopy(originalROIs, 0, currentROIs, 0, nROI);
+//
+//        configDriver = new SnakeConfigDriver();
+//        setAdvancedParameters();
+//
+//        dMinRegularization = dRegularization / 2.0;
+//        dMaxRegularization = dRegularization;
+//        // ?
+//        // init result
+//        resultStack = new ImageStack(stackWidth, stackHeight, java.awt.image.ColorModel.getRGBdefault());
+//        if (createsegimage) {
+//            pile_seg = new ImageStack(stackWidth, stackHeight);
+//        }
+//
+//        int nbcpu = 1;
+//        Thread[] threads = new Thread[nbcpu];
+//        final AtomicInteger k = new AtomicInteger(0);
+//        final ActiveContour[] activeContours = new ActiveContour[originalROIs.length];
+//
+//        // for all slices
+//
+//        // display in RGB color
+//        final ColorProcessor[] colorProcessors = new ColorProcessor[originalROIs.length];
+//        final ImagePlus[] imagesPlus = new ImagePlus[originalROIs.length];
+//
+//        int iDirection = slice1 < slice2 ? 1 : -1;
+//        for (int z = slice1; z != (slice2 + iDirection); z += iDirection) {
+//            final int zz = z;
+//            k.set(0);
+//
+//            for (int i = 0; i < originalROIs.length; i++) {
+//                colorProcessors[i] = (ColorProcessor) (resultStack.getProcessor(zz).duplicate());
+//                imagesPlus[i] = new ImagePlus("Roi " + i, colorProcessors[i]);
+//            }
+//            for (int t = 0; t < threads.length; t++) {
+//                threads[t] = new Thread() {
+//
+//                    @Override
+//                    public void run() {
+//                        IJ.wait(1000);
+//                        Roi roi = null;
+//                        for (int i = k.getAndIncrement(); i < originalROIs.length; i = k.getAndIncrement()) {
+//
+//                            if (propagate) {
+//                                roi = currentROIs[i];
+//                            } else {
+//                                roi = originalROIs[i];
+//                            }
+//                            IJ.log("processing slice " + zz + " with roi " + i);
+//
+//                            activeContours[i] = processSnake(imagesPlus[i], roi, zz, i + 1);
+//                        }
+//                    }
+//                };
+//            }
+//
+//            for (int ithread = 0; ithread < threads.length; ++ithread) {
+//                threads[ithread].setPriority(Thread.NORM_PRIORITY);
+//                threads[ithread].start();
+//            }
+//            try {
+//                for (int ithread = 0; ithread < threads.length; ++ithread) {
+//                    threads[ithread].join();
+//                }
+//            } catch (InterruptedException ie) {
+//                throw new RuntimeException(ie);
+//            }
+//
+//            RoiEncoder saveRoi;
+//            ColorProcessor imageDraw = (ColorProcessor) (resultStack.getProcessor(zz).duplicate());
+//            for (int i = 0; i < originalROIs.length; i++) {
+//                activeContours[i].drawContour(imageDraw, colorDraw, 1);
+//                imagesPlus[i].hide();
+//                RoisResult[i] = activeContours[i].createRoi();
+//                RoisResult[i].setName("res-" + i);
+//                currentROIs[i] = activeContours[i].createRoi();
+//            }
+//            resultStack.setPixels(imageDraw.getPixels(), z);
+//
+//            if (createsegimage) {
+//                ByteProcessor seg = new ByteProcessor(pile_seg.getWidth(), pile_seg.getHeight());
+//                ByteProcessor tmp;
+//                for (int i = 0; i < originalROIs.length; i++) {
+//                    tmp = activeContours[i].segmentation(seg.getWidth(), seg.getHeight(), i + 1);
+//                    seg.copyBits(tmp, 0, 0, Blitter.ADD);
+//                }
+//                seg.resetMinAndMax();
+//                pile_seg.addSlice("Seg " + z, seg);
+//            }
+//
+////            if (savecoords) {
+////                for (int i = 0; i < RoisOrig.length; i++) {
+////                    try {
+////                        activeContours[i].writeCoordinates("ABSnake-r" + (i + 1) + "-z", zz, resXY);
+////                        saveRoi = new RoiEncoder("ABSnake-r" + (i + 1) + "-z" + zz + ".roi");
+////                        saveRoi.write(RoisResult[i]);
+////                    } catch (IOException ex) {
+////                        Logger.getLogger(ActiveContour.class.getName()).log(Level.SEVERE, null, ex);
+////                    }
+////                }
+////            } 
+//        }
+////        new ImagePlus("Draw", resultStack).show();
+////        if (createsegimage) {
+////            new ImagePlus("Seg", pile_seg).show();
+////        }
+//    }
+    /**
+     * Dialog advanced
+     *
+     * @return dialog ok ?
+     */
+    private void setAdvancedParameters() {
+        configDriver.setMaxDisplacement(Prefs.get("ABSnake_DisplMin.double", 0.1), Prefs.get("ABSnake_DisplMax.double", 2.0));
+        configDriver.setInvAlphaD(Prefs.get("ABSnake_InvAlphaMin.double", 0.5), Prefs.get("ABSnake_InvAlphaMax.double", 2.0));
+        configDriver.setReg(Prefs.get("ABSnake_RegMin.double", 0.1), Prefs.get("ABSnake_RegMax.double", 2.0));
+        configDriver.setStep(Prefs.get("ABSnake_MulFactor.double", 0.99));
+    }
+
+    /**
+     * do the snake algorithm on all images
+     *
+     * @param image RGB image to display the snake
+     * @param numSlice which image of the stack
+     */
+    public ActiveContour processActiveContour(ImagePlus imagePlus, Roi currentROI,
+            ImageProcessor roiImageProcessor, int numSlice, String numRoi) {
+
+        int i;
+
+        SnakeConfig config;
+
+        ActiveContour activeContour = new ActiveContour();
+        activeContour.Init(currentROI);
+        activeContour.setOriginalImage(roiImageProcessor);
+
+        IJ.showStatus("Calculating snake...");
+        if (step > 0) {
+            imagePlus.show();
+        }
+
+        double InvAlphaD = configDriver.getInvAlphaD(false);
+        double regMax = configDriver.getReg(false);
+        double regMin = configDriver.getReg(true);
+        double DisplMax = configDriver.getMaxDisplacement(false);
+        double mul = configDriver.getStep();
+
+        config = new SnakeConfig(gradientThreshold, DisplMax, DistMAX, regMin, regMax, 1.0 / InvAlphaD);
+        activeContour.setConfig(config);
+        // compute image gradient
+        activeContour.computeGrad(roiImageProcessor);
+
+        IJ.resetEscape();
+
+        FileSaver fs = new FileSaver(imagePlus);
+
+        double dist0 = 0.0;
+        double dist;
+        //double InvAlphaD0 = InvAlphaD;
+        for (i = 0; i < nIterations; i++) {
+            if (IJ.escapePressed()) {
+                break;
+            }
+            dist = activeContour.process();
+            if ((dist >= dist0) && (dist < force)) {
+                activeContour.computeGrad(roiImageProcessor);
+                config.update(mul);
+            }
+            dist0 = dist;
+
+            if ((step > 0) && ((i % step) == 0)) {
+                IJ.showStatus("Show intermediate result (iteration n" + (i + 1) + ")");
+                ByteProcessor image2 = (ByteProcessor) (roiImageProcessor.duplicate());
+
+                activeContour.drawContour(image2, colorDraw, 1);
+                imagePlus.setProcessor("", image2);
+                imagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
+                        + " (iteration n" + (i + 1) + ")");
+                imagePlus.updateAndRepaintWindow();
+                if (movie) {
+                    fs = new FileSaver(imagePlus);
+                    fs.saveAsTiff("ABsnake-t" + i + "-r" + numRoi + "-z"
+                            + numSlice + ".tif");
+                }
+            }
+        }
+        return activeContour;
     }
 
     /**
@@ -365,8 +733,8 @@ public class HysteresisThresholdingOp extends Operator {
      * rectangle.
      * @param y0 Y coordinate of the upper left corner point of the target tile
      * rectangle.
-     * @param w The width of the target tile rectangle.
-     * @param h The height of the target tile rectangle.
+     * @param w The stackWidth of the target tile rectangle.
+     * @param h The stackHeight of the target tile rectangle.
      * @return The source tile rectangle.
      */
     private Rectangle getSourceTileRectangle(int x0, int y0, int w, int h) {
@@ -409,8 +777,8 @@ public class HysteresisThresholdingOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(HysteresisThresholdingOp.class);
-            setOperatorUI(HysteresisThresholdingOpUI.class);
+            super(ActiveContourOp.class);
+            setOperatorUI(ActiveContourOpUI.class);
         }
     }
 }
