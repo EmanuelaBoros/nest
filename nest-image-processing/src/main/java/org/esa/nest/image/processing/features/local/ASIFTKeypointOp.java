@@ -13,17 +13,19 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation.basic;
+package org.esa.nest.image.processing.features.local;
 
 import com.bc.ceres.core.ProgressMonitor;
-import ij.ImagePlus;
-import ij.process.ByteProcessor;
-import ij.process.ImageProcessor;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.imageio.ImageIO;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
@@ -36,6 +38,13 @@ import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
+import org.openimaj.feature.local.list.LocalFeatureList;
+import org.openimaj.image.FImage;
+import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.MBFImage;
+import org.openimaj.image.feature.local.engine.DoGSIFTEngine;
+import org.openimaj.image.feature.local.keypoints.Keypoint;
+import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 
 /**
  * This plug-in takes as parameters a grayscale image and two thresholds (low
@@ -43,10 +52,10 @@ import org.esa.nest.gpf.OperatorUtils;
  *
  * @author Emanuela Boros
  */
-@OperatorMetadata(alias = "HysteresisThresholding",
+@OperatorMetadata(alias = "ASIFTKeypoint",
 category = "SAR Tools\\Image Processing",
-description = "HysteresisThresholding")
-public class HysteresisThresholdingOp extends Operator {
+description = "ASIFTKeypoint")
+public class ASIFTKeypointOp extends Operator {
 
     public static float[] probabilityHistogram;
     final static int MAX_VALUE = 256;
@@ -71,8 +80,10 @@ public class HysteresisThresholdingOp extends Operator {
     private int halfSizeY;
     private int filterSizeX = 3;
     private int filterSizeY = 3;
-    private static ImagePlus fullImagePlus;
-    private static ByteProcessor fullByteProcessor;
+    private static FImage fullFImage;
+    private static DoGSIFTEngine engine;
+//    private static LocalFeatureList<Keypoint> fullLocalFeatureList;
+    private static BufferedImage fullBufferedImage;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -90,6 +101,8 @@ public class HysteresisThresholdingOp extends Operator {
      */
     @Override
     public void initialize() throws OperatorException {
+
+        engine = new DoGSIFTEngine();
 
         try {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
@@ -155,7 +168,7 @@ public class HysteresisThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeSIFTKeypointList(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -181,38 +194,36 @@ public class HysteresisThresholdingOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private synchronized void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeSIFTKeypointList(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
         if (!processed) {
             final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+            fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
                     sourceBand.getSceneRasterHeight(),
                     BufferedImage.TYPE_USHORT_GRAY);
             fullBufferedImage.setData(fullRenderedImage.getData());
-
-            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-
-            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
-            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
-
             processed = true;
         }
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
+        BufferedImage bf = fullBufferedImage.getSubimage(srcTileRectangle.x, srcTileRectangle.y,
+                srcTileRectangle.width, srcTileRectangle.height);
+        FImage crop = ImageUtilities.createFImage(bf);
 
-        aPartProcessor.setRoi(srcTileRectangle);
+        engine.getOptions().setGaussianSigma(lowThreshold);
 
-        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findFeatures(crop);
+
+        KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
+                new MBFImage(crop, crop, crop), fullLocalFeatureList);
+        MBFImage imageWithKeypoints =
+                kpv.drawPatches(new Float[]{1.0f, 0.0f, 0.0f}, new Float[]{0.0f, 1.0f, 0.0f});
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance(imageWithKeypoints.toPackedARGBPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
@@ -223,142 +234,6 @@ public class HysteresisThresholdingOp extends Operator {
                         sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
-    }
-
-    /**
-     * Double thresholding
-     *
-     * @param imageProcessor original image
-     * @param highThreshold high threshold
-     * @param lowThreshold low threshold
-     * @return "trinarised" image
-     */
-    ImageProcessor trinarise(ByteProcessor imageProcessor, float highThreshold,
-            float lowThreshold) {
-
-        int width = imageProcessor.getWidth();
-        int height = imageProcessor.getHeight();
-        ImageProcessor returnedProcessor = imageProcessor.duplicate();
-
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-
-                float value = returnedProcessor.getPixelValue(x, y);
-
-                if (value >= highThreshold) {
-                    returnedProcessor.putPixel(x, y, 255);
-                } else if (value >= lowThreshold) {
-                    returnedProcessor.putPixel(x, y, 128);
-                }
-            }
-        }
-        return returnedProcessor;
-    }
-
-    /**
-     * Hysteresis thresholding
-     *
-     * @param imageProcessor original image
-     * @return thresholded image
-     */
-    ImageProcessor hysteresisThresholding(ByteProcessor imageProcessor) {
-
-        int width = imageProcessor.getWidth();
-        int height = imageProcessor.getHeight();
-
-        ImageProcessor returnedProcessor = imageProcessor.duplicate();
-        boolean change = true;
-
-        while (change) {
-            change = false;
-            for (int x = 1; x < width - 1; x++) {
-                for (int y = 1; y < height - 1; y++) {
-                    if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE - 1) {
-                        if (returnedProcessor.getPixelValue(x + 1, y) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x, y - 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x + 1, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y - 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x + 1, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y - 1, MAX_VALUE - 1);
-                        }
-                    }
-                }
-            }
-            if (change) {
-                for (int x = width - 2; x > 0; x--) {
-                    for (int y = height - 2; y > 0; y--) {
-                        if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE - 1) {
-                            if (returnedProcessor.getPixelValue(x + 1, y) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x, y - 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x + 1, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y - 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x + 1, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y - 1, MAX_VALUE - 1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // suppression
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE / 2) {
-                    returnedProcessor.putPixelValue(x, y, MIN_VALUE);
-                }
-            }
-        }
-        return returnedProcessor;
     }
 
     /**
@@ -412,8 +287,8 @@ public class HysteresisThresholdingOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(HysteresisThresholdingOp.class);
-            setOperatorUI(HysteresisThresholdingOpUI.class);
+            super(ASIFTKeypointOp.class);
+            setOperatorUI(ASIFTKeypointOpUI.class);
         }
     }
 }

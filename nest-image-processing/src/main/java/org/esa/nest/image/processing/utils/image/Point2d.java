@@ -1,4 +1,4 @@
-package org.esa.nest.image.processing.utils;
+package org.esa.nest.image.processing.utils.image;
 
 /**
  * point2d class
@@ -24,14 +24,19 @@ public class Point2d {
         y = 0.0;
     }
 
+    public Point2d(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
     /**
      * Description of the Method
      *
-     * @param p2 Description of the Parameter
+     * @param point2d Description of the Parameter
      * @return Description of the Return Value
      */
-    public double dist(Point2d p2) {
-        return (Math.sqrt((x - p2.x) * (x - p2.x) + (y - p2.y) * (y - p2.y)));
+    public double dist(Point2d point2d) {
+        return (Math.sqrt((x - point2d.x) * (x - point2d.x) + (y - point2d.y) * (y - point2d.y)));
     }
 
     /**
@@ -39,8 +44,8 @@ public class Point2d {
      *
      * @return Description of the Return Value
      */
+    @Override
     public String toString() {
-        String data = new String("x=" + x + " y=" + y);
-        return data;
+        return "x=" + x + " y=" + y;
     }
 }

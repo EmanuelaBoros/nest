@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2012 by Array Systems Computing Inc. http://www.array.ca
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3 of the License, or (at your option)
+ * any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, see http://www.gnu.org/licenses/
+ */
 package org.esa.nest.image.processing.segmentation;
 
 import ij.*;
@@ -7,13 +22,14 @@ import java.awt.*;
 import java.io.*;
 import java.text.NumberFormat;
 import java.util.Locale;
-import org.esa.nest.image.processing.utils.Point2d;
-import org.esa.nest.image.processing.utils.SnakeConfig;
+import org.esa.nest.image.processing.utils.image.Point2d;
+import org.esa.nest.image.processing.utils.configuration.ActiveContourConfiguration;
 
 /**
- * Main snakeD class
+ * Active Contour finds a contour that best approximates the perimeter of an
+ * object
  *
- * @author thomas.boudier@snv.jussieu.fr @created 26 aout 2003
+ * @author thomas.boudier@snv.jussieu.fr @created August 26th 2003
  */
 public class ActiveContour {
 
@@ -25,10 +41,12 @@ public class ActiveContour {
     private int state[];
     private int NPT;
     private int NMAX = 50000;
-    private int block, elimination, OFF;
+    private int OFF;
+    private int block;
+    private int elimination;
     private boolean closed;
-    private SnakeConfig config;
-    private ImageProcessor gradImage;
+    private ActiveContourConfiguration configuration;
+    private ImageProcessor gradientImage;
     private ImageProcessor originalImage;
 
     /**
@@ -54,8 +72,8 @@ public class ActiveContour {
      *
      * @param sc The new config value
      */
-    public void setConfig(SnakeConfig sc) {
-        config = sc;
+    public void setConfig(ActiveContourConfiguration sc) {
+        configuration = sc;
     }
 
     /**
@@ -87,12 +105,12 @@ public class ActiveContour {
     }
 
     /**
-     * Gets the config attribute of the ActiveContour object
+     * Gets the configuration attribute of the ActiveContour object
      *
-     * @return The config value
+     * @return The configuration value
      */
-    public SnakeConfig getConfig() {
-        return config;
+    public ActiveContourConfiguration getConfiguration() {
+        return configuration;
     }
 
     /**
@@ -114,11 +132,11 @@ public class ActiveContour {
     }
 
     /**
-     * Is the snake closed
+     * Is the snake isClosed
      *
      * @return Description of the Return Value
      */
-    public boolean closed() {
+    public boolean isClosed() {
         return closed;
     }
 
@@ -148,7 +166,7 @@ public class ActiveContour {
             yy = (int) (points[i + 1].y);
             A.drawLine(x, y, xx, yy);
         }
-        if (this.closed()) {
+        if (this.isClosed()) {
             x = (int) (points[NPT - 1].x);
             y = (int) (points[NPT - 1].y);
             xx = (int) (points[0].x);
@@ -162,7 +180,7 @@ public class ActiveContour {
      *
      * @param nb section number
      */
-    public void EcritFreeD(int nb) {
+    public void writeInFreeD(int nb) {
         try {
             File fichier = new File("freed" + (nb + 1) + ".txt");
             FileWriter fw = new FileWriter(fichier);
@@ -208,15 +226,14 @@ public class ActiveContour {
      * @param imp image plus
      * @return roi
      */
-    PolygonRoi createRoi() {
+    PolygonRoi createROI() {
         int xx[] = new int[NPT];
         int yy[] = new int[NPT];
         for (int i = 0; i < NPT; i++) {
             xx[i] = (int) (points[i].x);
             yy[i] = (int) (points[i].y);
         }
-        PolygonRoi rr = new PolygonRoi(xx, yy, NPT - 1, Roi.FREEROI);
-        return rr;
+        return new PolygonRoi(xx, yy, NPT - 1, Roi.FREEROI);
     }
 
     /**
@@ -224,7 +241,7 @@ public class ActiveContour {
      *
      * @param R ROI
      */
-    public void Init(Roi R) {
+    public void initActiveContour(Roi roi) {
         Double pos;
         double Rx;
         double Ry;
@@ -247,9 +264,9 @@ public class ActiveContour {
 
 
         //Calcul des points de la ROI
-        if ((R.getType() == Roi.OVAL) || (R.getType() == Roi.RECTANGLE)) {
+        if ((roi.getType() == Roi.OVAL) || (roi.getType() == Roi.RECTANGLE)) {
             closed = true;
-            Rectangle Rect = R.getBounds();
+            Rectangle Rect = roi.getBounds();
             int xc = Rect.x + Rect.width / 2;
             int yc = Rect.y + Rect.height / 2;
             Rx = ((double) Rect.width) / 2;
@@ -263,9 +280,9 @@ public class ActiveContour {
                 i++;
             }
             NPT = i;
-        } else if (R.getType() == Roi.LINE) {
+        } else if (roi.getType() == Roi.LINE) {
             closed = false;
-            Line l = (Line) (R);
+            Line l = (Line) (roi);
             Rx = (l.x2 - l.x1);
             Ry = (l.y2 - l.y1);
             a = Math.sqrt(Rx * Rx + Ry * Ry);
@@ -279,9 +296,9 @@ public class ActiveContour {
                 ind++;
             }
             NPT = ind;
-        } else if ((R.getType() == Roi.FREEROI) || (R.getType() == Roi.POLYGON)) {
+        } else if ((roi.getType() == Roi.FREEROI) || (roi.getType() == Roi.POLYGON)) {
             closed = true;
-            PolygonRoi p = (PolygonRoi) (R);
+            PolygonRoi p = (PolygonRoi) (roi);
             Rectangle rectBound = p.getBounds();
             int NBPT = p.getNCoordinates();
             int pointsX[] = p.getXCoordinates();
@@ -292,7 +309,7 @@ public class ActiveContour {
 
             }
             NPT = NBPT;
-            if (R.getType() == Roi.POLYGON) {
+            if (roi.getType() == Roi.POLYGON) {
                 this.resample(true);
             }
         } else {
@@ -397,10 +414,10 @@ public class ActiveContour {
     /**
      * main calculus function (matrix inversion)
      *
-     * @param deb first row
-     * @param fin last row
+     * @param iFirstRow first row
+     * @param iLastRow last row
      */
-    public void calculus(int deb, int fin) {
+    public void calculus(int iFirstRow, int iLastRow) {
         int i;
         Point2d bi;
         Point2d temp;
@@ -415,10 +432,10 @@ public class ActiveContour {
         temp = new Point2d();
         debtemp = new Point2d();
 
-        debtemp.x = points[deb].x;
-        debtemp.y = points[deb].y;
+        debtemp.x = points[iFirstRow].x;
+        debtemp.y = points[iFirstRow].y;
 
-        for (i = deb; i < fin; i++) {
+        for (i = iFirstRow; i < iLastRow; i++) {
             bi.x = points[i].x + deplace[i].x;
             bi.y = points[i].y + deplace[i].y;
             //gi = -lambda[i] * lambda[i + 1] - (lambda[i] * lambda[i]);
@@ -427,32 +444,32 @@ public class ActiveContour {
             gi = -lambda[i];
             di = -lambda[i + 1];
             mi = lambda[i] + lambda[i + 1] + 1.0;
-            if (i > deb) {
+            if (i > iFirstRow) {
                 temp.x = mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * points[i + 1].x + bi.x);
                 temp.y = mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * points[i + 1].y + bi.y);
             }
-            if ((i == deb) && (closed)) {
-                temp.x = mi * points[i].x + omega * (-gi * points[fin].x - mi * points[i].x - di * points[i + 1].x + bi.x);
-                temp.y = mi * points[i].y + omega * (-gi * points[fin].y - mi * points[i].y - di * points[i + 1].y + bi.y);
+            if ((i == iFirstRow) && (closed)) {
+                temp.x = mi * points[i].x + omega * (-gi * points[iLastRow].x - mi * points[i].x - di * points[i + 1].x + bi.x);
+                temp.y = mi * points[i].y + omega * (-gi * points[iLastRow].y - mi * points[i].y - di * points[i + 1].y + bi.y);
             }
-            if ((i == deb) && (!closed)) {
-                temp.x = points[deb].x * mi;
-                temp.y = points[deb].y * mi;
+            if ((i == iFirstRow) && (!closed)) {
+                temp.x = points[iFirstRow].x * mi;
+                temp.y = points[iFirstRow].y * mi;
             }
             points[i].x = temp.x / mi;
             points[i].y = temp.y / mi;
         }
         // LAST POINT
         if (closed) {
-            i = fin;
+            i = iLastRow;
             bi.x = points[i].x + deplace[i].x;
             bi.y = points[i].y + deplace[i].y;
             //gi = -lambda[i] * lambda[deb] - (lambda[i] * lambda[i]);
             //di = -lambda[i] * lambda[deb] - (lambda[deb] * lambda[deb]);
             //mi = (lambda[i] * lambda[i]) + 2.0 * lambda[i] * lambda[deb] + (lambda[deb] * lambda[deb]) + 1.0;
             gi = -lambda[i];
-            di = -lambda[deb];
-            mi = lambda[i] + lambda[deb] + 1.0;
+            di = -lambda[iFirstRow];
+            mi = lambda[i] + lambda[iFirstRow] + 1.0;
             temp.x = mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * debtemp.x + bi.x);
             temp.y = mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * debtemp.y + bi.y);
             points[i].x = temp.x / mi;
@@ -465,17 +482,18 @@ public class ActiveContour {
      *
      * @return Description of the Return Value
      */
-    public double compute_displacements() {
-        double som = 0.0;
-        double seuil = config.getGradThreshold();
-        double DivForce = config.getMaxDisplacement();
+    public double computeDisplacements() {
+        
+        double sum = 0.0;
+        double threshold =  configuration.getGradThreshold();
+        double DivForce = configuration.getMaxDisplacement();
         Point2d displ = new Point2d();
         double force;
-        som = 0;
+        sum = 0;
         for (int i = 0; i < NPT; i++) {
             displ.x = 0.0;
             displ.y = 0.0;
-            displ = compute_displ(i, seuil, 1000, 1000, 0);
+            displ = searchTheClosestEdge(i, threshold , 1000, 1000, 0);
 
             force = Math.sqrt(displ.x * displ.x + displ.y * displ.y);
             if (force > DivForce) {
@@ -487,9 +505,9 @@ public class ActiveContour {
             }
             force = Math.sqrt(deplace[i].x * deplace[i].x + deplace[i].y * deplace[i].y);
 
-            som += force;
+            sum += force;
         }
-        return som;
+        return sum;
     }
 
     /**
@@ -498,23 +516,24 @@ public class ActiveContour {
      * @param image Description of the Parameter
      */
     public void computeGrad(ImageProcessor image) {
-        gradImage = grad2d_deriche(image, config.getAlpha());
+        gradientImage = grad2d_deriche(image, configuration.getAlpha());
     }
 
     /**
      * search for the closest edge along the normal direction
      *
-     * @param num number for the snake point
-     * @param Edge_Threshold threshold
+     * @param iContourPoints number for the snake point
+     * @param dEdgeThreshold threshold
      * @param directions directions to look for
      * @return the displacement vector towards the edges
      */
-    Point2d compute_displ(int num, double Edge_Threshold, double dist_plus, double dist_minus, int dir) {
+    Point2d searchTheClosestEdge(int iContourPoints, double dEdgeThreshold,
+            double dDistancePlus, double dDistanceMinus, int dir) {
         double iy;
         double ix;
         double deplus;
         double demoins;
-        double scaleint = config.getMaxSearch();
+        double scaleint = configuration.getMaxSearch();
         double Dist;
         double crp = Double.NaN;
         double crm = Double.NaN;
@@ -529,8 +548,8 @@ public class ActiveContour {
         int scale = 10;
         double image_line[] = new double[(int) (2 * scale * scaleint + 1)];
 
-        pos = points[num];
-        norm = normale[num];
+        pos = points[iContourPoints];
+        norm = normale[iContourPoints];
 
         displacement = new Point2d();
         //recherche des points de la normale au point de contour
@@ -546,19 +565,19 @@ public class ActiveContour {
             if (iy < 0) {
                 iy = 0;
             }
-            if (ix >= gradImage.getWidth()) {
-                ix = gradImage.getWidth() - 1;
+            if (ix >= gradientImage.getWidth()) {
+                ix = gradientImage.getWidth() - 1;
             }
-            if (iy >= gradImage.getHeight()) {
-                iy = gradImage.getHeight() - 1;
+            if (iy >= gradientImage.getHeight()) {
+                iy = gradientImage.getHeight() - 1;
             }
-            image_line[index] = gradImage.getInterpolatedPixel(ix, iy);
+            image_line[index] = gradientImage.getInterpolatedPixel(ix, iy);
             index++;
         }
 
         // polygon crossing, avoid self-intersecting snake
         for (int i = 0; i < NPT - 1; i++) {
-            if ((i != num) && (i != num - 1)) {
+            if ((i != iContourPoints) && (i != iContourPoints - 1)) {
                 bden = (-norm.x * points[i + 1].y + norm.x * points[i].y + norm.y * points[i + 1].x - norm.y * points[i].x);
                 bnum = (-norm.x * pos.y + norm.x * points[i].y + norm.y * pos.x - norm.y * points[i].x);
                 if (bden != 0) {
@@ -588,7 +607,7 @@ public class ActiveContour {
         for (index = 1; index < 2 * scale * scaleint - 1; index++) {
             // check edge threshold
             // local maximum
-            if ((image_line[index] >= Edge_Threshold) && (image_line[index] >= image_line[index - 1]) && (image_line[index] >= image_line[index + 1])) {
+            if ((image_line[index] >= dEdgeThreshold) && (image_line[index] >= image_line[index - 1]) && (image_line[index] >= image_line[index + 1])) {
                 Dist = index * step + deb;
                 if ((Dist < 0) && (Dist > demoins)) {
                     demoins = Dist;
@@ -600,7 +619,7 @@ public class ActiveContour {
                 }
             }
         }
-        state[num] = 0;
+        state[iContourPoints] = 0;
         //posplus = deplus;
         //posmoins = demoins;
 
@@ -613,10 +632,10 @@ public class ActiveContour {
         }
 
         // check edges found against threshold distances plus and minus
-        if (deplus > dist_plus) {
+        if (deplus > dDistancePlus) {
             deplus = 2 * scaleint;
         }
-        if (demoins < -dist_minus) {
+        if (demoins < -dDistanceMinus) {
             demoins = -2 * scaleint;
         }
         if (Double.isInfinite(deplus) && Double.isInfinite(demoins)) {
@@ -675,7 +694,7 @@ public class ActiveContour {
          */
 
 
-        return (displacement);
+        return displacement;
     }
 
     /**
@@ -693,8 +712,8 @@ public class ActiveContour {
     public void compute_lambdas() {
         double force;
         double maxforce = 0.0;
-        double minr = config.getRegMin();
-        double maxr = config.getRegMax();
+        double minr = configuration.getRegMin();
+        double maxr = configuration.getRegMax();
 
         for (int i = 0; i < NPT; i++) {
             force = Math.sqrt(deplace[i].x * deplace[i].x + deplace[i].y * deplace[i].y);
@@ -1108,11 +1127,11 @@ public class ActiveContour {
         Point2d displ = new Point2d();
         double maxforce = 0.0;
         double som = 0.0;
-        double seuil = config.getGradThreshold();
-        double DivForce = config.getMaxDisplacement();
-        double minr = config.getRegMin();
-        double maxr = config.getRegMax();
-        double alpha = config.getAlpha();
+        double seuil = configuration.getGradThreshold();
+        double DivForce = configuration.getMaxDisplacement();
+        double minr = configuration.getRegMin();
+        double maxr = configuration.getRegMax();
+        double alpha = configuration.getAlpha();
 
         // EXPERIMENTAL
         double dist_plus = Prefs.get("ABSnake_ThreshDistPos.double", 100);
@@ -1128,7 +1147,7 @@ public class ActiveContour {
         for (i = 0; i < NPT; i++) {
             displ.x = 0.0;
             displ.y = 0.0;
-            displ = compute_displ(i, seuil, dist_plus, dist_minus, -1);
+            displ = searchTheClosestEdge(i, seuil, dist_plus, dist_minus, -1);
 
             force = Math.sqrt(Math.pow(displ.x, 2.0) + Math.pow(displ.y, 2.0));
             if (force > DivForce) {

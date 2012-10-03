@@ -1,11 +1,11 @@
-package org.esa.nest.image.processing.utils;
+package org.esa.nest.image.processing.utils.configuration;
 
 /**
  * Configuration parameters for the snake plug-in
  *
  * @author thomas @created 11 mai 2004
  */
-public class SnakeConfigDriver {
+public class ActiveContourConfigurationDriver {
 
     private double maxDisplacement0;
     private double maxDisplacement1;
@@ -18,7 +18,7 @@ public class SnakeConfigDriver {
     /**
      * Constructor for the snakeConfig object
      */
-    public SnakeConfigDriver() {
+    public ActiveContourConfigurationDriver() {
         maxDisplacement0 = 2.0;
         maxDisplacement1 = 0.1;
         inv_alphaD0 = 1.0 / 0.5;
@@ -29,7 +29,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Sets the maxDisplacement attribute of the SnakeConfigDriver object
+     * Sets the maxDisplacement attribute of the ActiveContourConfigurationDriver object
      *
      * @param min The new maxDisplacement value
      * @param max The new maxDisplacement value
@@ -40,7 +40,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Sets the invAlphaD attribute of the SnakeConfigDriver object
+     * Sets the invAlphaD attribute of the ActiveContourConfigurationDriver object
      *
      * @param min The new invAlphaD value
      * @param max The new invAlphaD value
@@ -51,7 +51,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Sets the reg attribute of the SnakeConfigDriver object
+     * Sets the reg attribute of the ActiveContourConfigurationDriver object
      *
      * @param min The new reg value
      * @param max The new reg value
@@ -62,7 +62,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Sets the step attribute of the SnakeConfigDriver object
+     * Sets the step attribute of the ActiveContourConfigurationDriver object
      *
      * @param s The new step value
      */
@@ -71,7 +71,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Gets the step attribute of the SnakeConfigDriver object
+     * Gets the step attribute of the ActiveContourConfigurationDriver object
      *
      * @return The step value
      */
@@ -80,7 +80,7 @@ public class SnakeConfigDriver {
     }
 
     /**
-     * Gets the alphaD attribute of the SnakeConfigDriver object
+     * Gets the alphaD attribute of the ActiveContourConfigurationDriver object
      *
      * @param min Description of the Parameter
      * @return The alphaD value

@@ -103,6 +103,31 @@
             <shortDescr>Invoke Active Contour on a single product</shortDescr>
             <targetProductNameSuffix>_Hys</targetProductNameSuffix>
         </action>
+        
+        <action>
+            <id>SIFTKeypointOp</id>
+            <helpId>SIFTKeypointOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>SIFT Keypoint</text>
+            <operatorName>SIFTKeypoint</operatorName>
+            <dialogTitle>SIFT Keypoint</dialogTitle>
+            <shortDescr>Invoke SIFT Keypoint on a single product</shortDescr>
+            <targetProductNameSuffix>_Sft</targetProductNameSuffix>
+        </action>
+        <action>
+            <id>ASIFTKeypointOp</id>
+            <helpId>ASIFTKeypointOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>ASIFT Keypoint</text>
+            <operatorName>SIFTKeypoint</operatorName>
+            <dialogTitle>ASIFT Keypoint</dialogTitle>
+            <shortDescr>Invoke ASIFT Keypoint on a single product</shortDescr>
+            <targetProductNameSuffix>_Sft</targetProductNameSuffix>
+        </action>
     </extension>
 
     <extension point="beam-ui:helpSets">

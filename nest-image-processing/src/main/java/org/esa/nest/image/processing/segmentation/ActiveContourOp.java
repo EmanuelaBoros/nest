@@ -20,6 +20,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
 import ij.gui.GenericDialog;
+import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import ij.io.FileSaver;
 import ij.plugin.frame.RoiManager;
@@ -31,9 +32,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
-import org.esa.beam.framework.datamodel.Band;
-import org.esa.beam.framework.datamodel.Product;
-import org.esa.beam.framework.datamodel.ProductData;
+import org.esa.beam.framework.datamodel.*;
 import org.esa.beam.framework.gpf.Operator;
 import org.esa.beam.framework.gpf.OperatorException;
 import org.esa.beam.framework.gpf.OperatorSpi;
@@ -42,9 +41,11 @@ import org.esa.beam.framework.gpf.annotations.OperatorMetadata;
 import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
+import org.esa.beam.util.ProductUtils;
 import org.esa.nest.gpf.OperatorUtils;
-import org.esa.nest.image.processing.utils.SnakeConfig;
-import org.esa.nest.image.processing.utils.SnakeConfigDriver;
+import org.esa.nest.image.processing.utils.configuration.ActiveContourConfiguration;
+import org.esa.nest.image.processing.utils.configuration.ActiveContourConfigurationDriver;
+import org.esa.nest.image.processing.utils.image.Point2d;
 
 @OperatorMetadata(alias = "ActiveContour",
 category = "SAR Tools\\Image Processing",
@@ -84,7 +85,7 @@ public class ActiveContourOp extends Operator {
     /**
      *
      */
-    SnakeConfigDriver configDriver;
+    ActiveContourConfigurationDriver driverConfiguration;
     @Parameter(description = "Number of Iterations", defaultValue = "100", label = "nIterations")
     int nIterations = 50;
     // step to display snake
@@ -108,6 +109,7 @@ public class ActiveContourOp extends Operator {
     boolean advanced = false;
     boolean propagate = true;
     boolean movie = false;
+    int nbRois;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -154,6 +156,8 @@ public class ActiveContourOp extends Operator {
 
         OperatorUtils.copyProductNodes(sourceProduct, targetProduct);
 
+        ProductUtils.copyVectorData(sourceProduct, targetProduct);
+
         OperatorUtils.addSelectedBands(
                 sourceProduct, sourceBandNames, targetProduct, targetBandNameToSourceBandName, true);
     }
@@ -167,12 +171,13 @@ public class ActiveContourOp extends Operator {
      * @param targetTile The current tile associated with the target band to be
      * computed.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
+     * computation cancellation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the target raster.
      */
     @Override
-    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm) throws OperatorException {
+    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm)
+            throws OperatorException {
 
         try {
             final Rectangle targetTileRectangle = targetTile.getRectangle();
@@ -190,7 +195,7 @@ public class ActiveContourOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            initializeActiveContoursProcessing(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            initializeActiveContoursProcessing(sourceBand, sourceRaster, targetTile, x0, y0, w, h);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -216,10 +221,10 @@ public class ActiveContourOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private synchronized void initializeActiveContoursProcessing(final Band sourceBand, final Tile sourceRaster,
-            final Tile targetTile, final int x0, final int y0, final int w, final int h,
-            final ProgressMonitor pm) {
-
+    private synchronized void initializeActiveContoursProcessing(final Band sourceBand,
+            final Tile sourceRaster, final Tile targetTile,
+            final int x0, final int y0, final int w, final int h) {
+        RoiManager roiManager = RoiManager.getInstance();
         if (!processed) {
             final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
             final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
@@ -233,9 +238,7 @@ public class ActiveContourOp extends Operator {
 
             fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
-            showDialog();
-
-            RoiManager roiManager = RoiManager.getInstance();
+            fullImagePlus.setProcessor(fullByteProcessor);
 
             if (roiManager == null) {
                 roiManager = new RoiManager();
@@ -247,45 +250,207 @@ public class ActiveContourOp extends Operator {
                     roiManager.add(fullImagePlus, originalROI, 0);
                 }
             }
+            showDialog();
 
             processed = true;
-        }
-        configDriver = new SnakeConfigDriver();
-        setAdvancedParameters();
 
-        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
-        Roi currentROI = new Roi(sourceRaster.getRectangle());
+            driverConfiguration = new ActiveContourConfigurationDriver();
 
-        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
+//        setAdvancedParameters();
 
-        aPartProcessor.setRoi(srcTileRectangle);
+//        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
+//
+            PlacemarkGroup placemarkGroup = sourceProduct.getGcpGroup();
 
-        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+//        JOptionPane.showMessageDialog(null, "value.. " + placemarkGroup.getName() + ","
+//                + placemarkGroup.getNodeCount(),
+//                "vectorDataGroup", JOptionPane.INFORMATION_MESSAGE);
 
-        configDriver = new SnakeConfigDriver();
-        setAdvancedParameters();
+            Point2d points[] = new Point2d[placemarkGroup.getNodeCount()];
 
-        dMinRegularization = dRegularization / 2.0;
-        dMaxRegularization = dRegularization;
-
-        ActiveContour currentActivecontour = processActiveContour(fullImagePlus,
-                currentROI, roiImageProcessor, w,
-                x0 + "," + y0);
-
-        currentActivecontour.drawContour(aPartProcessor, colorDraw, 2);
-
-        final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
-
-        final int maxY = y0 + h;
-        final int maxX = x0 + w;
-        for (int y = y0; y < maxY; ++y) {
-            for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+            for (int i = 0; i < placemarkGroup.getNodeCount(); i++) {
+                Placemark p = placemarkGroup.get(i);
+                points[i] = new Point2d(p.getPixelPos().x, p.getPixelPos().y);
             }
+
+            int xx[] = new int[placemarkGroup.getNodeCount()];
+            int yy[] = new int[placemarkGroup.getNodeCount()];
+
+            for (int i = 0; i < placemarkGroup.getNodeCount(); i++) {
+                xx[i] = (int) (points[i].x);
+                yy[i] = (int) (points[i].y);
+            }
+            PolygonRoi currentROI = new PolygonRoi(xx, yy, placemarkGroup.getNodeCount() - 1,
+                    Roi.FREEROI);
+            ActiveContour activeContour = new ActiveContour();
+            activeContour.initActiveContour(currentROI);
+            activeContour.setOriginalImage(fullImageProcessor);
+            Roi roi = activeContour.createROI();
+            roiManager.addRoi(roi);
+
+//            Roi currentROI = new Roi((int) p.getPixelPos().x, (int) p.getPixelPos().y, fullImagePlus);
+
+//            ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
+
+//            aPartProcessor.setRoi(currentROI);
+
+//            ImageProcessor roiImageProcessor = aPartProcessor.crop();
+
+//            ImagePlus plus = fullImagePlus.duplicate();
+//            plus.setRoi(currentROI);
+//            plus.show();
+
+            driverConfiguration = new ActiveContourConfigurationDriver();
+//
+            setAdvancedParameters();
+//
+            dMinRegularization = dRegularization / 2.0;
+            dMaxRegularization = dRegularization;
+
+            ActiveContour currentActivecontour = processActiveContour(fullImagePlus,
+                    currentROI, w,
+                    x0 + "," + y0);
+////
+//            currentActivecontour.drawContour(roiImageProcessor, colorDraw, 2);
+//
+//            final ProductData trgData = targetTile.getDataBuffer();
+//            final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+//
+//            final int maxY = y0 + h;
+//            final int maxX = x0 + w;
+//            for (int y = y0; y < maxY; ++y) {
+//                for (int x = x0; x < maxX; ++x) {
+//
+//                    trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
+//                            sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+//                }
+//            }
+
+            //Hashtable tableroi = roimanager.getROIs();
+//        nbRois = roiManager.getCount();
+//        final Roi[] RoisOrig = roiManager.getRoisAsArray();
+//        final Roi[] RoisCurrent = new Roi[nbRois];
+//        Roi[] RoisResult = new Roi[nbRois];
+//        System.arraycopy(RoisOrig, 0, RoisCurrent, 0, nbRois);
+//        JOptionPane.showMessageDialog(null, "value.. " + nbRois,
+//                "nbRois", JOptionPane.INFORMATION_MESSAGE);
+
+//        if (true) {
+//            driverConfiguration = new ActiveContourConfigurationDriver();
+//            setAdvancedParameters();
+//            // ?
+//            dMinRegularization = dRegularization / 2.0;
+//            dMaxRegularization = dRegularization;
+//            // ?
+//            // init result
+//            ImagePlus pile_resultat = fullImagePlus.duplicate();
+//
+//            int nbcpu = 1;
+//            Thread[] threads = new Thread[nbcpu];
+//            final AtomicInteger k = new AtomicInteger(0);
+//            final ActiveContour[] snakes = new ActiveContour[RoisOrig.length];
+//            // for all slices
+//            // display in RGB color
+//            final ByteProcessor[] image = new ByteProcessor[RoisOrig.length];
+//            final ImagePlus[] pluses = new ImagePlus[RoisOrig.length];
+//
+//            int sens = slice1 < slice2 ? 1 : -1;
+//            for (int z = slice1; z != (slice2 + sens); z += sens) {
+//                final int zz = z;
+//                k.set(0);
+//
+//                for (int i = 0; i < RoisOrig.length; i++) {
+//                    image[i] = (ByteProcessor) (pile_resultat.getProcessor().duplicate());
+//                    pluses[i] = new ImagePlus("Roi " + i, image[i]);
+//                }
+//                // for all rois
+//                for (int t = 0; t < threads.length; t++) {
+//                    threads[t] = new Thread() {
+//
+//                        @Override
+//                        public void run() {
+//                            IJ.wait(1000);
+//                            Roi roi = null;
+//                            for (int i = k.getAndIncrement(); i < RoisOrig.length; i = k.getAndIncrement()) {
+//                                if (propagate) {
+//                                    roi = RoisCurrent[i];
+//                                } else {
+//                                    roi = RoisOrig[i];
+//                                }
+//                                IJ.log("processing slice " + zz + " with roi " + i);
+//
+//                                snakes[i] = processActiveContour(pluses[i], roi, zz, i + 1 + "");
+//                                // RoisCurrent[i] = imp.getRoi();
+//                                // imp_resultat.updateAndRepaintWindow();
+//                            } // for roi
+//                        }
+//                    };
+//                }// for threads
+//
+//                // launch threads
+//                for (int ithread = 0; ithread < threads.length; ++ithread) {
+//                    threads[ithread].setPriority(Thread.NORM_PRIORITY);
+//                    threads[ithread].start();
+//                }
+//
+//                try {
+//                    for (int ithread = 0; ithread < threads.length; ++ithread) {
+//                        threads[ithread].join();
+//                    }
+//                } catch (InterruptedException ie) {
+//                    throw new RuntimeException(ie);
+//                }
+//                // threads finished
+//
+//                // display + rois
+//                RoiEncoder saveRoi;
+//                ByteProcessor imageDraw = (ByteProcessor) (pile_resultat.getProcessor().duplicate());
+//                for (int i = 0; i < RoisOrig.length; i++) {
+//                    snakes[i].drawContour(imageDraw, colorDraw, 1);
+//                    pluses[i].hide();
+//                    RoisResult[i] = snakes[i].createROI();
+//                    RoisResult[i].setName("res-" + i);
+//                    RoisCurrent[i] = snakes[i].createROI();
+//                    // add results roi to manager
+//                    //roimanager.addRoi(RoisResult[i]);
+//
+//                }
+//                pile_resultat.setProcessor(imageDraw);
+//
+////                if (createsegimage) {
+////                    ByteProcessor seg = new ByteProcessor(pile_seg.getWidth(), pile_seg.getHeight());
+////                    ByteProcessor tmp;
+////                    for (int i = 0; i < RoisOrig.length; i++) {
+////                        tmp = snakes[i].segmentation(seg.getWidth(), seg.getHeight(), i + 1);
+////                        seg.copyBits(tmp, 0, 0, Blitter.ADD);
+////                    }
+////                    seg.resetMinAndMax();
+////                    pile_seg.addSlice("Seg " + z, seg);
+////                    //new ImagePlus("seg " + zz, seg).show();
+////                    //IJ.run("3-3-2 RGB");
+////                    // IJ.run("Enhance Contrast", "saturated=0.0");
+////                } // segmentation
+//
+////                if (savecoords) {
+////                    for (int i = 0; i < RoisOrig.length; i++) {
+////                        try {
+////                            snakes[i].writeCoordinates("ABSnake-r" + (i + 1) + "-z", zz,resXY);
+////                            saveRoi = new RoiEncoder("ABSnake-r" + (i + 1) + "-z" + zz + ".roi");
+////                            saveRoi.write(RoisResult[i]);
+////                        } catch (IOException ex) {
+////                            Logger.getLogger(ABSnake_.class.getName()).log(Level.SEVERE, null, ex);
+////                        }
+////                    }
+////                } // save coord
+//
+//            } // for z
+//            pile_resultat.show();
+////            if (createsegimage) {
+////                new ImagePlus("Seg", pile_seg).show();
+////            }
+//        }// dialog
         }
+
     }
 
     private boolean showDialog() {
@@ -403,7 +568,7 @@ public class ActiveContourOp extends Operator {
 //
 //        System.arraycopy(originalROIs, 0, currentROIs, 0, nROI);
 //
-//        configDriver = new SnakeConfigDriver();
+//        driverConfiguration = new ActiveContourConfigurationDriver();
 //        setAdvancedParameters();
 //
 //        dMinRegularization = dRegularization / 2.0;
@@ -474,9 +639,9 @@ public class ActiveContourOp extends Operator {
 //            for (int i = 0; i < originalROIs.length; i++) {
 //                activeContours[i].drawContour(imageDraw, colorDraw, 1);
 //                imagesPlus[i].hide();
-//                RoisResult[i] = activeContours[i].createRoi();
+//                RoisResult[i] = activeContours[i].createROI();
 //                RoisResult[i].setName("res-" + i);
-//                currentROIs[i] = activeContours[i].createRoi();
+//                currentROIs[i] = activeContours[i].createROI();
 //            }
 //            resultStack.setPixels(imageDraw.getPixels(), z);
 //
@@ -514,10 +679,10 @@ public class ActiveContourOp extends Operator {
      * @return dialog ok ?
      */
     private void setAdvancedParameters() {
-        configDriver.setMaxDisplacement(Prefs.get("ABSnake_DisplMin.double", 0.1), Prefs.get("ABSnake_DisplMax.double", 2.0));
-        configDriver.setInvAlphaD(Prefs.get("ABSnake_InvAlphaMin.double", 0.5), Prefs.get("ABSnake_InvAlphaMax.double", 2.0));
-        configDriver.setReg(Prefs.get("ABSnake_RegMin.double", 0.1), Prefs.get("ABSnake_RegMax.double", 2.0));
-        configDriver.setStep(Prefs.get("ABSnake_MulFactor.double", 0.99));
+        driverConfiguration.setMaxDisplacement(Prefs.get("ABSnake_DisplMin.double", 0.1), Prefs.get("ABSnake_DisplMax.double", 2.0));
+        driverConfiguration.setInvAlphaD(Prefs.get("ABSnake_InvAlphaMin.double", 0.5), Prefs.get("ABSnake_InvAlphaMax.double", 2.0));
+        driverConfiguration.setReg(Prefs.get("ABSnake_RegMin.double", 0.1), Prefs.get("ABSnake_RegMax.double", 2.0));
+        driverConfiguration.setStep(Prefs.get("ABSnake_MulFactor.double", 0.99));
     }
 
     /**
@@ -526,36 +691,38 @@ public class ActiveContourOp extends Operator {
      * @param image RGB image to display the snake
      * @param numSlice which image of the stack
      */
-    public ActiveContour processActiveContour(ImagePlus imagePlus, Roi currentROI,
-            ImageProcessor roiImageProcessor, int numSlice, String numRoi) {
+    public ActiveContour processActiveContour(ImagePlus originalImagePlus,
+            Roi currentROI, int numSlice, String numRoi) {
 
         int i;
 
-        SnakeConfig config;
+        ActiveContourConfiguration config;
 
         ActiveContour activeContour = new ActiveContour();
-        activeContour.Init(currentROI);
-        activeContour.setOriginalImage(roiImageProcessor);
+        activeContour.initActiveContour(currentROI);
+        activeContour.setOriginalImage(originalImagePlus.getProcessor());
 
         IJ.showStatus("Calculating snake...");
         if (step > 0) {
-            imagePlus.show();
+            originalImagePlus.show();
         }
 
-        double InvAlphaD = configDriver.getInvAlphaD(false);
-        double regMax = configDriver.getReg(false);
-        double regMin = configDriver.getReg(true);
-        double DisplMax = configDriver.getMaxDisplacement(false);
-        double mul = configDriver.getStep();
+        double InvAlphaD = driverConfiguration.getInvAlphaD(false);
+        double regMax = driverConfiguration.getReg(false);
+        double regMin = driverConfiguration.getReg(true);
+        double DisplMax = driverConfiguration.getMaxDisplacement(false);
+        double mul = driverConfiguration.getStep();
 
-        config = new SnakeConfig(gradientThreshold, DisplMax, DistMAX, regMin, regMax, 1.0 / InvAlphaD);
+        config = new ActiveContourConfiguration(gradientThreshold, DisplMax, DistMAX,
+                regMin, regMax, 1.0 / InvAlphaD);
         activeContour.setConfig(config);
+
         // compute image gradient
-        activeContour.computeGrad(roiImageProcessor);
+        activeContour.computeGrad(originalImagePlus.getProcessor());
 
         IJ.resetEscape();
 
-        FileSaver fs = new FileSaver(imagePlus);
+        FileSaver fs = new FileSaver(originalImagePlus);
 
         double dist0 = 0.0;
         double dist;
@@ -566,22 +733,22 @@ public class ActiveContourOp extends Operator {
             }
             dist = activeContour.process();
             if ((dist >= dist0) && (dist < force)) {
-                activeContour.computeGrad(roiImageProcessor);
+                activeContour.computeGrad(originalImagePlus.getProcessor());
                 config.update(mul);
             }
             dist0 = dist;
 
             if ((step > 0) && ((i % step) == 0)) {
                 IJ.showStatus("Show intermediate result (iteration n" + (i + 1) + ")");
-                ByteProcessor image2 = (ByteProcessor) (roiImageProcessor.duplicate());
+                ByteProcessor image2 = (ByteProcessor) (originalImagePlus.getProcessor().duplicate());
 
                 activeContour.drawContour(image2, colorDraw, 1);
-                imagePlus.setProcessor("", image2);
-                imagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
+                originalImagePlus.setProcessor("", image2);
+                originalImagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
                         + " (iteration n" + (i + 1) + ")");
-                imagePlus.updateAndRepaintWindow();
+                originalImagePlus.updateAndRepaintWindow();
                 if (movie) {
-                    fs = new FileSaver(imagePlus);
+                    fs = new FileSaver(originalImagePlus);
                     fs.saveAsTiff("ABsnake-t" + i + "-r" + numRoi + "-z"
                             + numSlice + ".tif");
                 }

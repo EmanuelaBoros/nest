@@ -47,7 +47,6 @@ public class MixtureModelingThresholdingOp extends Operator {
     private int threshold;
     final static int MAX_VALUE = 0;
     final static int MIN_VALUE = 256;
-    private boolean probabilityHistogramDone;
     public static int N;
     @SourceProduct(alias = "source")
     private Product sourceProduct = null;
@@ -196,7 +195,6 @@ public class MixtureModelingThresholdingOp extends Operator {
         int height = fullByteProcessor.getHeight();
 
         N = width * height;
-        probabilityHistogramDone = false;
 
         GrayLevelClassMixtureModeling classes = new GrayLevelClassMixtureModeling(fullByteProcessor);
 
