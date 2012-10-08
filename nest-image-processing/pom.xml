@@ -68,6 +68,10 @@
             <id>imagej.thirdparty</id>
             <url>http://maven.imagej.net/content/repositories/thirdparty</url>
         </repository>
+        <repository>
+            <id>matrices</id>
+            <url>http://code.google.com/p/matrix-toolkits-java/source/browse/</url>
+        </repository>
     </repositories>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -77,28 +81,18 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
         </dependency>
-        <!--<dependency>
-            <groupId>imagej</groupId>
-            <artifactId>imagej</artifactId>
-            <version>1.37</version>
-        </dependency>
-        <dependency>
-            <groupId>net.imagej</groupId>
-            <artifactId>ij</artifactId>
-            <version>1.45b</version>
-        </dependency>-->
         <dependency>
             <groupId>org.openimaj</groupId>
             <artifactId>core-image</artifactId>
             <version>1.0.6-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
-        <!--<dependency>
+        <dependency>
             <groupId>org.openimaj</groupId>
-            <artifactId>image-feature-extraction</artifactId>
+            <artifactId>core-math</artifactId>
             <version>1.0.6-SNAPSHOT</version>
             <scope>compile</scope>
-        </dependency>-->
+        </dependency>
         <dependency>
             <groupId>org.openimaj</groupId>
             <artifactId>image-local-features</artifactId>
@@ -106,16 +100,28 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>net.sf.jafama</groupId>
+            <artifactId>JaFaMa</artifactId>
+            <version>1.2</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>jama</groupId>
+            <artifactId>jama</artifactId>
+            <version>1.0.2</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.matrix-toolkits-java</groupId>
+            <artifactId>mtj</artifactId>
+            <version>0.9.14</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>net.imagej</groupId>
             <artifactId>ij</artifactId>
             <version>1.45b</version>
         </dependency>
-        <!--<dependency>
-            <groupId>net.imagej</groupId>
-            <artifactId>ij</artifactId>
-            <version>1.45b</version>
-        </dependency>-->
-
         <dependency>
             <groupId>org.jaitools</groupId>
             <artifactId>jt-all</artifactId>
