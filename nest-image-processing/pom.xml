@@ -71,7 +71,19 @@
         <repository>
             <id>matrices</id>
             <url>http://code.google.com/p/matrix-toolkits-java/source/browse/</url>
+        </repository>        
+        <repository>
+            <id>OpenIMAJ maven repository</id>
+            <url>http://maven.openimaj.org/</url>
         </repository>
+        <repository>
+            <id>Octopussy thirdparty maven repository</id>
+            <url>http://octopussy.ecs.soton.ac.uk/m2/thirdparty/</url>
+        </repository>
+        <repository>
+            <id>OpenIMAJ snapshots maven repository</id>
+            <url>http://octopussy.ecs.soton.ac.uk/m2/snapshots/</url>
+        </repository>      
     </repositories>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
