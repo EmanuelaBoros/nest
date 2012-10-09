@@ -20,7 +20,6 @@ import ij.ImagePlus;
 import ij.process.ImageProcessor;
 import org.esa.beam.framework.datamodel.Band;
 import ij.process.ByteProcessor;
-
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.framework.gpf.Operator;
@@ -32,7 +31,6 @@ import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
-
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
@@ -100,8 +98,8 @@ public class MorphologyOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -161,7 +159,8 @@ public class MorphologyOp extends Operator {
      * during computation of the target raster.
      */
     @Override
-    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm) throws OperatorException {
+    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm)
+            throws OperatorException {
 
         try {
             final Rectangle targetTileRectangle = targetTile.getRectangle();
@@ -228,8 +227,10 @@ public class MorphologyOp extends Operator {
     }
 
     /**
-     * Apply the selected morphology operator
      *
+     * Apply an Operator Operator
+     *
+     * @param sourceBand The source band.
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
      * computed.
@@ -238,11 +239,11 @@ public class MorphologyOp extends Operator {
      * @param y0 Y coordinate for the upper-left point of the
      * target_Tile_Rectangle.
      * @param w Width for the target_Tile_Rectangle.
-     * @param h Hight for the target_Tile_Rectangle.
+     * @param h Height for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
-     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
-     * during computation of the filtered value.
+     * computation cancellation requests.
+     * @param method The thresholding method that will be applied.
+     * @param paramMap The parameters list for every thresholding method.
      */
     private synchronized void computeOperator(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,

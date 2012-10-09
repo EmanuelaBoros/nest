@@ -13,10 +13,12 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation.basic;
+package org.esa.nest.image.processing.segmentation.thresholding;
 
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.util.Map;
 import javax.swing.*;
 import org.esa.beam.framework.gpf.ui.BaseOperatorUI;
@@ -25,9 +27,14 @@ import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
-public class HysteresisThresholdingOpUI extends BaseOperatorUI {
+public class BasicThresholdingOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
+    private final JComboBox operator = new JComboBox(new String[]{
+                BasicThresholdingOp.Method.Hysteresis,
+                BasicThresholdingOp.Method.MixtureModeling,
+                BasicThresholdingOp.Method.MaximumEntropy,
+                BasicThresholdingOp.Method.Otsu});
     private final JLabel highThresholdLabel = new JLabel("HighThreshold");
     private final JTextField highThreshold = new JTextField("");
     private final JLabel lowThresholdLabel = new JLabel("LowThreshold");
@@ -47,6 +54,7 @@ public class HysteresisThresholdingOpUI extends BaseOperatorUI {
     @Override
     public void initParameters() {
         OperatorUIUtils.initBandList(bandList, getBandNames());
+        operator.setSelectedItem(paramMap.get("operator"));
         highThreshold.setText(String.valueOf(paramMap.get("highThreshold")));
         lowThreshold.setText(String.valueOf(paramMap.get("lowThreshold")));
     }
@@ -59,6 +67,7 @@ public class HysteresisThresholdingOpUI extends BaseOperatorUI {
     @Override
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
+        paramMap.put("operator", operator.getSelectedItem());
         paramMap.put("lowThreshold", Float.parseFloat(lowThreshold.getText()));
         paramMap.put("highThreshold", Float.parseFloat(highThreshold.getText()));
     }
@@ -70,6 +79,15 @@ public class HysteresisThresholdingOpUI extends BaseOperatorUI {
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
         gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, "Operator:", operator);
+
+        operator.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent event) {
+                updateOperatorSelection();
+            }
+        });
+        gbc.gridy++;
         DialogUtils.addComponent(contentPane, gbc, lowThresholdLabel, lowThreshold);
         gbc.gridy++;
         DialogUtils.addComponent(contentPane, gbc, highThresholdLabel, highThreshold);
@@ -80,8 +98,20 @@ public class HysteresisThresholdingOpUI extends BaseOperatorUI {
 
         contentPane.add(new JPanel(), gbc);
 
-        DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, true);
-        DialogUtils.enableComponents(highThresholdLabel, highThreshold, true);
+        DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, false);
+        DialogUtils.enableComponents(highThresholdLabel, highThreshold, false);
         return contentPane;
+    }
+
+    private void updateOperatorSelection() {
+        final String item = (String) operator.getSelectedItem();
+
+        if (item.equals(BasicThresholdingOp.Method.Hysteresis)) {
+            DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, true);
+            DialogUtils.enableComponents(highThresholdLabel, highThreshold, true);
+        } else {
+            DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, false);
+            DialogUtils.enableComponents(highThresholdLabel, highThreshold, false);
+        }
     }
 }

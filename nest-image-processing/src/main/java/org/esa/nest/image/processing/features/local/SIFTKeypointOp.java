@@ -16,18 +16,11 @@
 package org.esa.nest.image.processing.features.local;
 
 import com.bc.ceres.core.ProgressMonitor;
-import ij.process.ByteProcessor;
-import ij.process.ImageProcessor;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.imageio.ImageIO;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
@@ -217,8 +210,6 @@ public class SIFTKeypointOp extends Operator {
 
         LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findKeypoints(crop);
 
-//        JOptionPane.showMessageDialog(null, fullLocalFeatureList.size() + "",
-//                "Result", JOptionPane.INFORMATION_MESSAGE);
         KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
                 new MBFImage(crop, crop, crop), fullLocalFeatureList);
         MBFImage imageWithKeypoints =

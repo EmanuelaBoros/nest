@@ -13,10 +13,12 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation.basic;
+package org.esa.nest.image.processing.segmentation.thresholding.separate;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.ImageStack;
+import ij.process.AutoThresholder;
 import ij.process.ImageProcessor;
 import org.esa.beam.framework.datamodel.Band;
 import ij.process.ByteProcessor;
@@ -38,6 +40,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
+import javax.swing.JOptionPane;
 
 @OperatorMetadata(alias = "OtsuThresholding",
 category = "SAR Tools\\Image Processing",
@@ -160,7 +163,6 @@ public class OtsuThresholdingOp extends Operator {
             pm.done();
         }
     }
-
     /**
      * Apply Otsu Thresholding
      *
@@ -178,6 +180,8 @@ public class OtsuThresholdingOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
+    private static ImageProcessor fullByteProcessor;
+
     private synchronized void computeOtsuThresholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
@@ -190,46 +194,69 @@ public class OtsuThresholdingOp extends Operator {
             fullBufferedImage.setData(fullRenderedImage.getData());
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+//            JOptionPane.showMessageDialog(null, fullImagePlus.getBitDepth() + ", "
+//                    + fullImagePlus.getProcessor().getCurrentColorModel(),
+//                    "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
+
+            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+
+            ImageProcessor tmp1 = null;
+            ImageStack stack = fullImagePlus.getStack();
+            ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
+
+            tmp1 = fullImageProcessor.convertToShort(true);
+            for (int s = 1; s <= stack.getSize(); s++) {
+//                tmp1 = ImageEdge.trin(stack.getProcessor(s), highThreshold, lowThreshold);
+                tmp1.setAutoThreshold(AutoThresholder.Method.Otsu, false, ImageProcessor.RED_LUT);
+                tmp1.autoThreshold();
+                res_trin.addSlice("", tmp1);
+            }
+            fullByteProcessor = new ImagePlus("Hysteresis", res_trin).getProcessor();//.convertToShort(true);
+//            fullByteProcessor = (ByteProcessor) new ImagePlus("Hysteresis", res_trin).getProcessor().convertToByte(true);
+
+//            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+//            fullByteProcessor.setAutoThreshold(AutoThresholder.Method.Otsu, false, ImageProcessor.RED_LUT);
+//            fullByteProcessor.autoThreshold();
             processed = true;
         }
 
         final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+//        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
-        int width = fullByteProcessor.getWidth();
-        int height = fullByteProcessor.getHeight();
-
-        int intMax = (int) fullByteProcessor.getMax();
-
-        N = width * height;
-        probabilityHistogramDone = false;
-
-        GrayLevel grayLevelTrue =
-                new GrayLevel(fullByteProcessor, true);
-        GrayLevel grayLevelFalse =
-                new GrayLevel(fullByteProcessor, false);
-
-        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
-                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
-
-        double sigmaMax = 0d;
-        float threshold = 0f;
-
-        for (int i = 0; i < intMax; i++) {
-
-            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
-                    + (double) grayLevelFalse.getOmega()
-                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
-
-            if (sigma > sigmaMax) {
-                sigmaMax = sigma;
-                threshold = grayLevelTrue.getThreshold();
-            }
-
-            grayLevelTrue.addToEnd();
-            grayLevelFalse.removeFromBeginning();
-        }
+//        int width = fullByteProcessor.getWidth();
+//        int height = fullByteProcessor.getHeight();
+//
+//        int intMax = (int) fullByteProcessor.getMax();
+//
+//        N = width * height;
+//        probabilityHistogramDone = false;
+//
+//        GrayLevel grayLevelTrue =
+//                new GrayLevel(fullByteProcessor, true);
+//        GrayLevel grayLevelFalse =
+//                new GrayLevel(fullByteProcessor, false);
+//
+//        float fullMu = (float) grayLevelTrue.getOmega() * grayLevelTrue.getMu()
+//                + (float) grayLevelFalse.getOmega() * grayLevelFalse.getMu();
+//
+//        double sigmaMax = 0d;
+//        float threshold = 0f;
+//
+//        for (int i = 0; i < intMax; i++) {
+//
+//            double sigma = (double) grayLevelTrue.getOmega() * (Math.pow(grayLevelTrue.getMu() - fullMu, 2))
+//                    + (double) grayLevelFalse.getOmega()
+//                    * (Math.pow(grayLevelFalse.getMu() - fullMu, 2));
+//
+//            if (sigma > sigmaMax) {
+//                sigmaMax = sigma;
+//                threshold = grayLevelTrue.getThreshold();
+//            }
+//
+//            grayLevelTrue.addToEnd();
+//            grayLevelFalse.removeFromBeginning();
+//        }
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
@@ -237,26 +264,16 @@ public class OtsuThresholdingOp extends Operator {
 
         ImageProcessor roiImageProcessor = fullByteProcessor.crop();
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                float value = roiImageProcessor.getPixelValue(x, y);
-                if (value <= threshold) {
-                    roiImageProcessor.putPixelValue(x, y, 0);
-                } else {
-                    roiImageProcessor.putPixelValue(x, y, 255);
-                }
-            }
-        }
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance((short[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
 
-                trgData.setElemDoubleAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemDoubleAt(sourceRaster.getDataBufferIndex(x, y)));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
+                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
     }

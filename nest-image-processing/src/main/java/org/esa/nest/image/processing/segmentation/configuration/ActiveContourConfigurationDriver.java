@@ -1,53 +1,57 @@
-package org.esa.nest.image.processing.utils.configuration;
+package org.esa.nest.image.processing.segmentation.configuration;
 
 /**
  * Configuration parameters for the snake plug-in
  *
- * @author thomas @created 11 mai 2004
+ * @author Thomas
+ * @since 11 May 2004
+ * @author Emanuela Boros @updated September 2012
  */
 public class ActiveContourConfigurationDriver {
 
-    private double maxDisplacement0;
-    private double maxDisplacement1;
-    private double inv_alphaD0;
-    private double inv_alphaD1;
-    private double reg0;
-    private double reg1;
-    private double step;
+    private double dMaxDisplacement0;
+    private double dMaxDisplacement1;
+    private double dInvAlphaD0;
+    private double dInvAlphaD1;
+    private double dReg0;
+    private double dReg1;
+    private double dStep;
 
     /**
      * Constructor for the snakeConfig object
      */
     public ActiveContourConfigurationDriver() {
-        maxDisplacement0 = 2.0;
-        maxDisplacement1 = 0.1;
-        inv_alphaD0 = 1.0 / 0.5;
-        inv_alphaD1 = 1.0 / 2.0;
-        reg0 = 2.0;
-        reg1 = 0.1;
-        step = 0.99;
+        dMaxDisplacement0 = 2.0;
+        dMaxDisplacement1 = 0.1;
+        dInvAlphaD0 = 1.0 / 0.5;
+        dInvAlphaD1 = 1.0 / 2.0;
+        dReg0 = 2.0;
+        dReg1 = 0.1;
+        dStep = 0.99;
     }
 
     /**
-     * Sets the maxDisplacement attribute of the ActiveContourConfigurationDriver object
+     * Sets the maxDisplacement attribute of the
+     * ActiveContourConfigurationDriver object
      *
      * @param min The new maxDisplacement value
      * @param max The new maxDisplacement value
      */
     public void setMaxDisplacement(double min, double max) {
-        maxDisplacement1 = min;
-        maxDisplacement0 = max;
+        dMaxDisplacement1 = min;
+        dMaxDisplacement0 = max;
     }
 
     /**
-     * Sets the invAlphaD attribute of the ActiveContourConfigurationDriver object
+     * Sets the invAlphaD attribute of the ActiveContourConfigurationDriver
+     * object
      *
      * @param min The new invAlphaD value
      * @param max The new invAlphaD value
      */
     public void setInvAlphaD(double min, double max) {
-        inv_alphaD1 = min;
-        inv_alphaD0 = max;
+        dInvAlphaD1 = min;
+        dInvAlphaD0 = max;
     }
 
     /**
@@ -57,8 +61,8 @@ public class ActiveContourConfigurationDriver {
      * @param max The new reg value
      */
     public void setReg(double min, double max) {
-        reg1 = min;
-        reg0 = max;
+        dReg1 = min;
+        dReg0 = max;
     }
 
     /**
@@ -67,7 +71,7 @@ public class ActiveContourConfigurationDriver {
      * @param s The new step value
      */
     public void setStep(double s) {
-        step = s;
+        dStep = s;
     }
 
     /**
@@ -76,7 +80,7 @@ public class ActiveContourConfigurationDriver {
      * @return The step value
      */
     public double getStep() {
-        return step;
+        return dStep;
     }
 
     /**
@@ -87,9 +91,9 @@ public class ActiveContourConfigurationDriver {
      */
     public double getInvAlphaD(boolean min) {
         if (min) {
-            return inv_alphaD1;
+            return dInvAlphaD1;
         } else {
-            return inv_alphaD0;
+            return dInvAlphaD0;
         }
     }
 
@@ -101,9 +105,9 @@ public class ActiveContourConfigurationDriver {
      */
     public double getMaxDisplacement(boolean min) {
         if (min) {
-            return maxDisplacement1;
+            return dMaxDisplacement1;
         } else {
-            return maxDisplacement0;
+            return dMaxDisplacement0;
         }
     }
 
@@ -115,9 +119,9 @@ public class ActiveContourConfigurationDriver {
      */
     public double getReg(boolean min) {
         if (min) {
-            return reg1;
+            return dReg1;
         } else {
-            return reg0;
+            return dReg0;
         }
     }
 }

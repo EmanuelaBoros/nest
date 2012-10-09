@@ -13,10 +13,11 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation.basic;
+package org.esa.nest.image.processing.segmentation.thresholding.separate;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import java.awt.Rectangle;
@@ -196,9 +197,26 @@ public class HysteresisThresholdingOp extends Operator {
 
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
-            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
-            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
+            ImageStack stack = fullImagePlus.getStack();
+            ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
+            ImageStack res_hyst = new ImageStack(stack.getWidth(), stack.getHeight());
+
+            ImageProcessor tmp1 = null;
+            ImageProcessor tmp2 = null;
+
+            for (int s = 1; s <= stack.getSize(); s++) {
+//                tmp1 = ImageEdge.trin(stack.getProcessor(s), highThreshold, lowThreshold);
+                tmp1 = (ByteProcessor) trinarise((ByteProcessor) stack.getProcessor(s).convertToByte(true),
+                        highThreshold, lowThreshold);
+                res_trin.addSlice("", tmp1);
+                tmp2 = (ByteProcessor) hysteresisThresholding((ByteProcessor) tmp1.convertToByte(true));
+                res_hyst.addSlice("", tmp2);
+
+            }
+            fullByteProcessor = (ByteProcessor) new ImagePlus("Hysteresis", res_hyst).getProcessor().convertToByte(true);
+//            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+//            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
+//            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
 
             processed = true;
         }

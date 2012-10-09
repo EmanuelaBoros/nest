@@ -13,15 +13,12 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, see http://www.gnu.org/licenses/
  */
-package org.esa.nest.image.processing.segmentation.basic;
+package org.esa.nest.image.processing.segmentation.thresholding;
 
 import com.bc.ceres.core.ProgressMonitor;
-import ij.ImagePlus;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import java.awt.Rectangle;
-import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
 import java.util.HashMap;
 import java.util.Map;
 import org.esa.beam.framework.datamodel.Band;
@@ -38,15 +35,16 @@ import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
 
 /**
- * This plug-in takes as parameters a grayscale image and two thresholds (low
- * and high), and returns the hysteresis thresholded image
+ * This plug-in takes as parameters a gray scale image and returns a thresholded
+ * image. The implemented methods are Hysteresis, MaximumEntropy,
+ * MixtureModeling and Otsu.
  *
  * @author Emanuela Boros
  */
-@OperatorMetadata(alias = "HysteresisThresholding",
+@OperatorMetadata(alias = "BasicThresholding",
 category = "SAR Tools\\Image Processing",
-description = "HysteresisThresholding")
-public class HysteresisThresholdingOp extends Operator {
+description = "BasicThresholding")
+public class BasicThresholdingOp extends Operator {
 
     public static float[] probabilityHistogram;
     final static int MAX_VALUE = 256;
@@ -59,11 +57,17 @@ public class HysteresisThresholdingOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
+    @Parameter(valueSet = {Method.Hysteresis, Method.MaximumEntropy,
+        Method.MixtureModeling, Method.Otsu},
+    defaultValue = Method.Otsu,
+    label = "Operator")
+    private String operator;
     @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
     private float highThreshold = 100f;
     @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
     private float lowThreshold = 10f;
-    private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
+    private final Map<String, String[]> targetBandNameToSourceBandName =
+            new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
     private boolean processed = false;
@@ -71,13 +75,21 @@ public class HysteresisThresholdingOp extends Operator {
     private int halfSizeY;
     private int filterSizeX = 3;
     private int filterSizeY = 3;
-    private static ImagePlus fullImagePlus;
     private static ByteProcessor fullByteProcessor;
+
+    public static class Method {
+
+        static final String Hysteresis = "Hysteresis";
+        static final String MaximumEntropy = "MaximumEntropy";
+        static final String MixtureModeling = "MixtureModeling";
+        static final String Otsu = "Otsu";
+    }
+    protected Map<String, Object> paramMap = null;
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -91,6 +103,7 @@ public class HysteresisThresholdingOp extends Operator {
     @Override
     public void initialize() throws OperatorException {
 
+        paramMap = new HashMap<String, Object>();
         try {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
             sourceImageHeight = sourceProduct.getSceneRasterHeight();
@@ -132,12 +145,13 @@ public class HysteresisThresholdingOp extends Operator {
      * @param targetTile The current tile associated with the target band to be
      * computed.
      * @param pm A progress monitor which should be used to determine
-     * computation cancelation requests.
+     * computation cancellation requests.
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the target raster.
      */
     @Override
-    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm) throws OperatorException {
+    public void computeTile(Band targetBand, Tile targetTile, ProgressMonitor pm)
+            throws OperatorException {
 
         try {
             final Rectangle targetTileRectangle = targetTile.getRectangle();
@@ -154,9 +168,25 @@ public class HysteresisThresholdingOp extends Operator {
             if (sourceRaster == null) {
                 throw new OperatorException("Cannot get source tile");
             }
-
-            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
-
+            if (operator.equals(Method.MixtureModeling)) {
+                computeThresholding(sourceBand, sourceRaster,
+                        targetTile, x0, y0, w, h, pm,
+                        ThresholdingTypeOperator.MixtureModeling, paramMap);
+            } else if (operator.equals(Method.MaximumEntropy)) {
+                computeThresholding(sourceBand, sourceRaster,
+                        targetTile, x0, y0, w, h, pm,
+                        ThresholdingTypeOperator.MaximumEntropy, paramMap);
+            } else if (operator.equals(Method.Hysteresis)) {
+                paramMap.put("lowThreshold", lowThreshold);
+                paramMap.put("highThreshold", highThreshold);
+                computeThresholding(sourceBand, sourceRaster,
+                        targetTile, x0, y0, w, h, pm,
+                        ThresholdingTypeOperator.Hysteresis, paramMap);
+            } else {
+                computeThresholding(sourceBand, sourceRaster,
+                        targetTile, x0, y0, w, h, pm,
+                        ThresholdingTypeOperator.Otsu, paramMap);
+            }
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
         } finally {
@@ -165,8 +195,10 @@ public class HysteresisThresholdingOp extends Operator {
     }
 
     /**
-     * Apply HysteresisThesholding
      *
+     * Apply a Thresholding Method
+     *
+     * @param sourceBand The source band.
      * @param sourceRaster The source tile for the band.
      * @param targetTile The current tile associated with the target band to be
      * computed.
@@ -175,31 +207,19 @@ public class HysteresisThresholdingOp extends Operator {
      * @param y0 Y coordinate for the upper-left point of the
      * target_Tile_Rectangle.
      * @param w Width for the target_Tile_Rectangle.
-     * @param h Hight for the target_Tile_Rectangle.
+     * @param h Height for the target_Tile_Rectangle.
      * @param pm A progress monitor which should be used to determine
      * computation cancellation requests.
-     * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
-     * during computation of the filtered value.
+     * @param method The thresholding method that will be applied.
+     * @param paramMap The parameters list for every thresholding method.
      */
-    private synchronized void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeThresholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
-            final ProgressMonitor pm) {
+            final ProgressMonitor pm, ThresholdingTypeOperator method, Map<String, Object> paramMap) {
 
         if (!processed) {
-            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
-                    sourceBand.getSceneRasterHeight(),
-                    BufferedImage.TYPE_USHORT_GRAY);
-            fullBufferedImage.setData(fullRenderedImage.getData());
-
-            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-
-            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
-            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
-
+            fullByteProcessor = method.computeThresholdingOperator(
+                    sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm, paramMap);
             processed = true;
         }
 
@@ -212,7 +232,8 @@ public class HysteresisThresholdingOp extends Operator {
         ImageProcessor roiImageProcessor = aPartProcessor.crop();
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance(
+                (byte[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
@@ -223,142 +244,6 @@ public class HysteresisThresholdingOp extends Operator {
                         sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
             }
         }
-    }
-
-    /**
-     * Double thresholding
-     *
-     * @param imageProcessor original image
-     * @param highThreshold high threshold
-     * @param lowThreshold low threshold
-     * @return "trinarised" image
-     */
-    ImageProcessor trinarise(ByteProcessor imageProcessor, float highThreshold,
-            float lowThreshold) {
-
-        int width = imageProcessor.getWidth();
-        int height = imageProcessor.getHeight();
-        ImageProcessor returnedProcessor = imageProcessor.duplicate();
-
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-
-                float value = returnedProcessor.getPixelValue(x, y);
-
-                if (value >= highThreshold) {
-                    returnedProcessor.putPixel(x, y, 255);
-                } else if (value >= lowThreshold) {
-                    returnedProcessor.putPixel(x, y, 128);
-                }
-            }
-        }
-        return returnedProcessor;
-    }
-
-    /**
-     * Hysteresis thresholding
-     *
-     * @param imageProcessor original image
-     * @return thresholded image
-     */
-    ImageProcessor hysteresisThresholding(ByteProcessor imageProcessor) {
-
-        int width = imageProcessor.getWidth();
-        int height = imageProcessor.getHeight();
-
-        ImageProcessor returnedProcessor = imageProcessor.duplicate();
-        boolean change = true;
-
-        while (change) {
-            change = false;
-            for (int x = 1; x < width - 1; x++) {
-                for (int y = 1; y < height - 1; y++) {
-                    if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE - 1) {
-                        if (returnedProcessor.getPixelValue(x + 1, y) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x, y - 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x + 1, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y - 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x - 1, y + 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x - 1, y + 1, MAX_VALUE - 1);
-                        }
-                        if (returnedProcessor.getPixelValue(x + 1, y - 1) == MAX_VALUE / 2) {
-                            change = true;
-                            returnedProcessor.putPixelValue(x + 1, y - 1, MAX_VALUE - 1);
-                        }
-                    }
-                }
-            }
-            if (change) {
-                for (int x = width - 2; x > 0; x--) {
-                    for (int y = height - 2; y > 0; y--) {
-                        if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE - 1) {
-                            if (returnedProcessor.getPixelValue(x + 1, y) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x, y - 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x + 1, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y - 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x - 1, y + 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x - 1, y + 1, MAX_VALUE - 1);
-                            }
-                            if (returnedProcessor.getPixelValue(x + 1, y - 1) == MAX_VALUE / 2) {
-                                change = true;
-                                returnedProcessor.putPixelValue(x + 1, y - 1, MAX_VALUE - 1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // suppression
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                if (returnedProcessor.getPixelValue(x, y) == MAX_VALUE / 2) {
-                    returnedProcessor.putPixelValue(x, y, MIN_VALUE);
-                }
-            }
-        }
-        return returnedProcessor;
     }
 
     /**
@@ -412,8 +297,8 @@ public class HysteresisThresholdingOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(HysteresisThresholdingOp.class);
-            setOperatorUI(HysteresisThresholdingOpUI.class);
+            super(BasicThresholdingOp.class);
+            setOperatorUI(BasicThresholdingOpUI.class);
         }
     }
 }

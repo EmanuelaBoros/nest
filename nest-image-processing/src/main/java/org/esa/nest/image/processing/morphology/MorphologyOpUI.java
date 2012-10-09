@@ -15,7 +15,6 @@
  */
 package org.esa.nest.image.processing.morphology;
 
-import org.esa.nest.image.processing.defaulting.MorphologyOp2;
 import org.esa.beam.framework.gpf.ui.BaseOperatorUI;
 import org.esa.beam.framework.gpf.ui.UIValidation;
 import org.esa.beam.framework.ui.AppContext;

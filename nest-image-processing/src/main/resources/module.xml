@@ -128,6 +128,43 @@
             <shortDescr>Invoke ASIFT Keypoint on a single product</shortDescr>
             <targetProductNameSuffix>_Sft</targetProductNameSuffix>
         </action>
+        <action>
+            <id>MaximumEntropyThresholdingOp</id>
+            <helpId>MaximumEntropyThresholdingOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>MaximumEntropyThresholdingOp</text>
+            <operatorName>MaximumEntropyThresholding</operatorName>
+            <dialogTitle>MaximumEntropyThresholdingOp</dialogTitle>
+            <shortDescr>Invoke MaximumEntropyThresholdingOp on a single product</shortDescr>
+            <targetProductNameSuffix>_Met</targetProductNameSuffix>
+        </action>
+        <action>
+            <id>BasicThresholdingOp</id>
+            <helpId>BasicThresholdingOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>BasicThresholdingOp</text>
+            <operatorName>BasicThresholding</operatorName>
+            <dialogTitle>BasicThresholdingOp</dialogTitle>
+            <shortDescr>Invoke BasicThresholdingOp on a single product</shortDescr>
+            <targetProductNameSuffix>_Met</targetProductNameSuffix>
+        </action>
+        
+        <action>
+            <id>DericheEdgeDetectorOp</id>
+            <helpId>DericheEdgeDetectorOp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>DericheEdgeDetector</text>
+            <operatorName>DericheEdgeDetector</operatorName>
+            <dialogTitle>Deriche Edge Detector</dialogTitle>
+            <shortDescr>Invoke Deriche Edge Detector on a single product</shortDescr>
+            <targetProductNameSuffix>_Ded</targetProductNameSuffix>
+        </action>
     </extension>
 
     <extension point="beam-ui:helpSets">

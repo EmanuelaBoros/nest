@@ -19,13 +19,8 @@ import com.bc.ceres.core.ProgressMonitor;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.imageio.ImageIO;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
@@ -47,7 +42,7 @@ import org.openimaj.image.feature.local.keypoints.Keypoint;
 import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 
 /**
- * This plug-in takes as parameters a grayscale image and two thresholds (low
+ * This plug-in takes as parameters a gray scale image and two thresholds (low
  * and high), and returns the hysteresis thresholded image
  *
  * @author Emanuela Boros

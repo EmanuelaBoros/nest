@@ -15,6 +15,7 @@
  */
 package org.esa.nest.image.processing.segmentation;
 
+import org.esa.nest.image.processing.segmentation.configuration.ActiveContourConfiguration;
 import ij.*;
 import ij.gui.*;
 import ij.process.*;
@@ -22,20 +23,20 @@ import java.awt.*;
 import java.io.*;
 import java.text.NumberFormat;
 import java.util.Locale;
-import org.esa.nest.image.processing.utils.image.Point2d;
-import org.esa.nest.image.processing.utils.configuration.ActiveContourConfiguration;
+import org.esa.beam.framework.datamodel.PixelPos;
 
 /**
  * Active Contour finds a contour that best approximates the perimeter of an
  * object
  *
- * @author thomas.boudier@snv.jussieu.fr @created August 26th 2003
+ * @author thomas.boudier@snv.jussieu.fr
+ * @created August 26th 2003
  */
 public class ActiveContour {
 
-    private Point2d points[];
-    private Point2d normale[];
-    private Point2d deplace[];
+    private PixelPos points[];
+    private PixelPos normale[];
+    private PixelPos deplace[];
     private double dataDistance;
     private double lambda[];
     private int state[];
@@ -91,7 +92,7 @@ public class ActiveContour {
      * @param i Description of the Parameter
      * @return The point value
      */
-    public Point2d getPoint(int i) {
+    public PixelPos getPoint(int i) {
         return points[i];
     }
 
@@ -100,7 +101,7 @@ public class ActiveContour {
      *
      * @return The points value
      */
-    public Point2d[] getPoints() {
+    public PixelPos[] getPoints() {
         return points;
     }
 
@@ -127,7 +128,7 @@ public class ActiveContour {
      *
      * @return The displacement value
      */
-    public Point2d[] getDisplacement() {
+    public PixelPos[] getDisplacement() {
         return deplace;
     }
 
@@ -151,7 +152,7 @@ public class ActiveContour {
      * @param col Description of the Parameter
      * @param linewidth Description of the Parameter
      */
-    public void drawContour(ImageProcessor A, Color col, int linewidth) {
+    public ImageProcessor drawContour(ImageProcessor A, Color col, int linewidth) {
         int i;
         int x;
         int y;
@@ -173,6 +174,7 @@ public class ActiveContour {
             yy = (int) (points[0].y);
             A.drawLine(x, y, xx, yy);
         }
+        return A;
     }
 
     /**
@@ -249,17 +251,17 @@ public class ActiveContour {
         double a;
         NPT = 0;
 
-        points = new Point2d[NMAX];
-        normale = new Point2d[NMAX];
-        deplace = new Point2d[NMAX];
+        points = new PixelPos[NMAX];
+        normale = new PixelPos[NMAX];
+        deplace = new PixelPos[NMAX];
         dataDistance = 0.0;
         state = new int[NMAX];
         lambda = new double[NMAX];
 
         for (i = 0; i < NMAX; i++) {
-            points[i] = new Point2d();
-            normale[i] = new Point2d();
-            deplace[i] = new Point2d();
+            points[i] = new PixelPos();
+            normale[i] = new PixelPos();
+            deplace[i] = new PixelPos();
         }
 
 
@@ -290,8 +292,8 @@ public class ActiveContour {
             Ry /= a;
             int ind = 0;
             for (i = 0; i <= l.getLength(); i++) {
-                points[ind].x = l.x1 + Rx * i;
-                points[ind].y = l.y1 + Ry * i;
+                points[ind].x = (float) (l.x1 + Rx * i);
+                points[ind].y = (float) (l.y1 + Ry * i);;
                 state[ind] = 0;
                 ind++;
             }
@@ -321,11 +323,11 @@ public class ActiveContour {
     }
 
     /**
-     * regularisation of distance between points
+     * regularization of distance between points
      */
     void resample(boolean init) {
-        Point2d temp[];
-        Point2d Ta;
+        PixelPos temp[];
+        PixelPos Ta;
         int i;
         int j;
         int k;
@@ -342,8 +344,8 @@ public class ActiveContour {
         double D;
         double D1;
 
-        temp = new Point2d[NMAX];
-        Ta = new Point2d();
+        temp = new PixelPos[NMAX];
+        Ta = new PixelPos();
 
         Dtot = 0.0;
         Dmin = 1000.0;
@@ -360,12 +362,12 @@ public class ActiveContour {
         }
         if (((Dmax / Dmin) > 3.0) || (init)) {
             Dmoyg = 1.0;
-            temp[0] = new Point2d();
+            temp[0] = new PixelPos();
             temp[0].x = points[0].x;
             temp[0].y = points[0].y;
             i = 1;
             ii = 1;
-            temp[ii] = new Point2d();
+            temp[ii] = new PixelPos();
             while (i < NPT) {
                 Dmoy = Dmoyg;
                 DD = distance(i, i - 1);
@@ -377,10 +379,10 @@ public class ActiveContour {
                     Ta.x /= normtan;
                     Ta.y /= normtan;
                     for (k = 1; k <= aj; k++) {
-                        temp[ii].x = points[i - 1].x + k * Dmoy * Ta.x;
-                        temp[ii].y = points[i - 1].y + k * Dmoy * Ta.y;
+                        temp[ii].x = points[i - 1].x + (float) (k * Dmoy * Ta.x);
+                        temp[ii].y = points[i - 1].y + (float) (k * Dmoy * Ta.y);
                         ii++;
-                        temp[ii] = new Point2d();
+                        temp[ii] = new PixelPos();
                     }
                 }
                 i++;
@@ -394,7 +396,7 @@ public class ActiveContour {
                     temp[ii].x = points[j].x;
                     temp[ii].y = points[j].y;
                     ii++;
-                    temp[ii] = new Point2d();
+                    temp[ii] = new PixelPos();
                     i = j + 1;
                 }
                 if (i == NPT - 1) {
@@ -405,8 +407,8 @@ public class ActiveContour {
             temp[ii].y = points[NPT - 1].y;
             NPT = ii + 1;
             for (i = 0; i < NPT; i++) {
-                points[i].x = temp[i].x;
-                points[i].y = temp[i].y;
+                points[i].x = (float) (temp[i].x);
+                points[i].y = (float) (temp[i].y);
             }
         }
     }
@@ -419,18 +421,18 @@ public class ActiveContour {
      */
     public void calculus(int iFirstRow, int iLastRow) {
         int i;
-        Point2d bi;
-        Point2d temp;
-        Point2d debtemp;
+        PixelPos bi;
+        PixelPos temp;
+        PixelPos debtemp;
         double mi;
         double gi;
         double di;
         double omega;
 
         omega = 1.8;
-        bi = new Point2d();
-        temp = new Point2d();
-        debtemp = new Point2d();
+        bi = new PixelPos();
+        temp = new PixelPos();
+        debtemp = new PixelPos();
 
         debtemp.x = points[iFirstRow].x;
         debtemp.y = points[iFirstRow].y;
@@ -445,19 +447,19 @@ public class ActiveContour {
             di = -lambda[i + 1];
             mi = lambda[i] + lambda[i + 1] + 1.0;
             if (i > iFirstRow) {
-                temp.x = mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * points[i + 1].x + bi.x);
-                temp.y = mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * points[i + 1].y + bi.y);
+                temp.x = (float) (mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * points[i + 1].x + bi.x));
+                temp.y = (float) (mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * points[i + 1].y + bi.y));
             }
             if ((i == iFirstRow) && (closed)) {
-                temp.x = mi * points[i].x + omega * (-gi * points[iLastRow].x - mi * points[i].x - di * points[i + 1].x + bi.x);
-                temp.y = mi * points[i].y + omega * (-gi * points[iLastRow].y - mi * points[i].y - di * points[i + 1].y + bi.y);
+                temp.x = (float) (mi * points[i].x + omega * (-gi * points[iLastRow].x - mi * points[i].x - di * points[i + 1].x + bi.x));
+                temp.y = (float) (mi * points[i].y + omega * (-gi * points[iLastRow].y - mi * points[i].y - di * points[i + 1].y + bi.y));
             }
             if ((i == iFirstRow) && (!closed)) {
-                temp.x = points[iFirstRow].x * mi;
-                temp.y = points[iFirstRow].y * mi;
+                temp.x = points[iFirstRow].x * (float) (mi);
+                temp.y = points[iFirstRow].y * (float) (mi);
             }
-            points[i].x = temp.x / mi;
-            points[i].y = temp.y / mi;
+            points[i].x = (float) (temp.x / mi);
+            points[i].y = (float) (temp.y / mi);
         }
         // LAST POINT
         if (closed) {
@@ -470,10 +472,10 @@ public class ActiveContour {
             gi = -lambda[i];
             di = -lambda[iFirstRow];
             mi = lambda[i] + lambda[iFirstRow] + 1.0;
-            temp.x = mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * debtemp.x + bi.x);
-            temp.y = mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * debtemp.y + bi.y);
-            points[i].x = temp.x / mi;
-            points[i].y = temp.y / mi;
+            temp.x = (float) (mi * points[i].x + omega * (-gi * points[i - 1].x - mi * points[i].x - di * debtemp.x + bi.x));
+            temp.y = (float) (mi * points[i].y + omega * (-gi * points[i - 1].y - mi * points[i].y - di * debtemp.y + bi.y));
+            points[i].x = (float) (temp.x / mi);
+            points[i].y = (float) (temp.y / mi);
         }
     }
 
@@ -483,25 +485,25 @@ public class ActiveContour {
      * @return Description of the Return Value
      */
     public double computeDisplacements() {
-        
-        double sum = 0.0;
-        double threshold =  configuration.getGradThreshold();
+
+        double sum = 0d;
+        double threshold = configuration.getGradThreshold();
         double DivForce = configuration.getMaxDisplacement();
-        Point2d displ = new Point2d();
+        PixelPos displ = new PixelPos();
         double force;
         sum = 0;
         for (int i = 0; i < NPT; i++) {
-            displ.x = 0.0;
-            displ.y = 0.0;
-            displ = searchTheClosestEdge(i, threshold , 1000, 1000, 0);
+            displ.x = 0f;
+            displ.y = 0f;
+            displ = searchTheClosestEdge(i, threshold, 1000, 1000, 0);
 
             force = Math.sqrt(displ.x * displ.x + displ.y * displ.y);
             if (force > DivForce) {
-                deplace[i].x = DivForce * (displ.x / force);
-                deplace[i].y = DivForce * (displ.y / force);
+                deplace[i].x = (float) (DivForce * (displ.x / force));
+                deplace[i].y = (float) (DivForce * (displ.y / force));
             } else {
-                deplace[i].x = displ.x;
-                deplace[i].y = displ.y;
+                deplace[i].x = (float) (displ.x);
+                deplace[i].y = (float) (displ.y);
             }
             force = Math.sqrt(deplace[i].x * deplace[i].x + deplace[i].y * deplace[i].y);
 
@@ -515,8 +517,8 @@ public class ActiveContour {
      *
      * @param image Description of the Parameter
      */
-    public void computeGrad(ImageProcessor image) {
-        gradientImage = grad2d_deriche(image, configuration.getAlpha());
+    public void computeGradient(ImageProcessor image) {
+        gradientImage = computeDeriche(image, configuration.getAlpha());
     }
 
     /**
@@ -527,7 +529,7 @@ public class ActiveContour {
      * @param directions directions to look for
      * @return the displacement vector towards the edges
      */
-    Point2d searchTheClosestEdge(int iContourPoints, double dEdgeThreshold,
+    PixelPos searchTheClosestEdge(int iContourPoints, double dEdgeThreshold,
             double dDistancePlus, double dDistanceMinus, int dir) {
         double iy;
         double ix;
@@ -542,16 +544,16 @@ public class ActiveContour {
         double bden;
         double bnum;
         double ii;
-        Point2d displacement;
-        Point2d pos;
-        Point2d norm;
+        PixelPos displacement;
+        PixelPos pos;
+        PixelPos norm;
         int scale = 10;
         double image_line[] = new double[(int) (2 * scale * scaleint + 1)];
 
         pos = points[iContourPoints];
         norm = normale[iContourPoints];
 
-        displacement = new Point2d();
+        displacement = new PixelPos();
         //recherche des points de la normale au point de contour
         int index = 0;
         double step = 1.0 / (double) scale;
@@ -625,8 +627,8 @@ public class ActiveContour {
 
         // no edge found
         if (!edge_found) {
-            displacement.x = 0.0;
-            displacement.y = 0.0;
+            displacement.x = 0f;
+            displacement.y = 0f;
 
             return displacement;
         }
@@ -639,8 +641,8 @@ public class ActiveContour {
             demoins = -2 * scaleint;
         }
         if (Double.isInfinite(deplus) && Double.isInfinite(demoins)) {
-            displacement.x = 0.0;
-            displacement.y = 0.0;
+            displacement.x = 0f;
+            displacement.y = 0f;
 
             return displacement;
         }
@@ -650,12 +652,12 @@ public class ActiveContour {
         int direction;
         // go to closest edge
         if (-demoins < deplus) {
-            displacement.x = norm.x * demoins;
-            displacement.y = norm.y * demoins;
+            displacement.x = (float) (norm.x * demoins);
+            displacement.y = (float) (norm.y * demoins);
             direction = -1;
         } else {
-            displacement.x = norm.x * deplus;
-            displacement.y = norm.y * deplus;
+            displacement.x = (float) (norm.x * deplus);
+            displacement.y = (float) (norm.y * deplus);
             direction = 1;
         }
 
@@ -734,13 +736,13 @@ public class ActiveContour {
      * @param np number for the snake point
      * @return normal vector
      */
-    Point2d compute_normale(int np) {
-        Point2d norma;
-        Point2d tan;
+    PixelPos compute_normale(int np) {
+        PixelPos norma;
+        PixelPos tan;
         double normtan;
 
-        tan = new Point2d();
-        norma = new Point2d();
+        tan = new PixelPos();
+        norma = new PixelPos();
 
         if (np == 0) {
             if (closed) {
@@ -778,26 +780,26 @@ public class ActiveContour {
      * destruction
      */
     void destroysnake() {
-        Point2d temp[];
-        Point2d fo[];
+        PixelPos temp[];
+        PixelPos fo[];
         double lan[];
         int state[];
         int i;
         int j;
 
-        temp = new Point2d[NPT];
-        fo = new Point2d[NPT];
+        temp = new PixelPos[NPT];
+        fo = new PixelPos[NPT];
         lan = new double[NPT];
         state = new int[NPT];
 
         j = 0;
         for (i = 0; i < NPT; i++) {
             if (state[i] != 1) {
-                temp[j] = new Point2d();
+                temp[j] = new PixelPos();
                 temp[j].x = points[i].x;
                 temp[j].y = points[i].y;
                 state[j] = state[i];
-                fo[j] = new Point2d();
+                fo[j] = new PixelPos();
                 fo[j].x = deplace[i].x;
                 fo[j].y = deplace[i].y;
                 lan[j] = lambda[i];
@@ -841,68 +843,40 @@ public class ActiveContour {
      * @param alphaD Description of the Parameter
      * @return Description of the Return Value
      */
-    private ImageProcessor grad2d_deriche(ImageProcessor iDep, double alphaD) {
+    private ImageProcessor computeDeriche(ImageProcessor iDep, double alphaD) {
+
         //ImageProcessor iGrad = iDep.createProcessor(iDep.getWidth(), iDep.getHeight());
-        ImageProcessor iGrad = new ByteProcessor(iDep.getWidth(), iDep.getHeight());
-        int nmem;
-        float[] nf_grx = null;
-        float[] nf_gry = null;
-        float[] a1 = null;
-        float[] a2 = null;
-        float[] a3 = null;
-        float[] a4 = null;
-        byte[] result_array = null;
 
-        int icolonnes = 0;
-        int icoll = 0;
-        int lignes;
-        int colonnes;
-        int lig_1;
-        int lig_2;
-        int lig_3;
-        int col_1;
-        int col_2;
-        int col_3;
-        int jp1;
-        int jm1;
-        int im1;
-        int ip1;
-        int icol_1;
-        int icol_2;
-        int i;
-        int j;
-        float ad1;
-        float ad2;
-        float wd;
-        float gzr;
-        float gun;
-        float an1;
-        float an2;
-        float an3;
-        float an4;
-        float an11;
+        ByteProcessor iGrad = (ByteProcessor) iDep.duplicate().convertToByte(true);
 
-        lignes = iDep.getHeight();
-        colonnes = iDep.getWidth();
-        nmem = lignes * colonnes;
+//        new ByteProcessor(iDep.getWidth(), iDep.getHeight());
 
-        lig_1 = lignes - 1;
-        lig_2 = lignes - 2;
-        lig_3 = lignes - 3;
-        col_1 = colonnes - 1;
-        col_2 = colonnes - 2;
-        col_3 = colonnes - 3;
+        int lines = iDep.getHeight();
+        int columns = iDep.getWidth();
+        int nmem = lines * columns;
+        float[] nf_gry = new float[nmem];
 
-        /*
-         * alloc temporary buffers
-         */
-        nf_grx = new float[nmem];
-        nf_gry = new float[nmem];
+        float[] a1 = new float[nmem];
+        float[] a2 = new float[nmem];
+        float[] a3 = new float[nmem];
+        float[] a4 = new float[nmem];
+        int iColumns = 0;
+        int iCol = 0;
+        int line1, line2, line3;
+        int col1, col2, col3;
+        int jp1, jm1, im1, ip1;
+        int icol_1, icol_2;
+        int i, j;
+        float ad1, ad2;
+        float wd, gzr, gun, an1;
+        float an2, an3, an4, an11;
 
-        a1 = new float[nmem];
-        a2 = new float[nmem];
-        a3 = new float[nmem];
-        a4 = new float[nmem];
+        line1 = lines - 1;
+        line2 = lines - 2;
+        line3 = lines - 3;
+        col1 = columns - 1;
+        col2 = columns - 2;
+        col3 = columns - 3;
 
         ad1 = (float) -Math.exp(-alphaD);
         ad2 = 0;
@@ -918,38 +892,38 @@ public class ActiveContour {
         /*
          * x-smoothing
          */
-        for (i = 0; i < lignes; i++) {
-            for (j = 0; j < colonnes; j++) {
-                a1[i * colonnes + j] = iDep.getPixelValue(j, i);
+        for (i = 0; i < lines; i++) {
+            for (j = 0; j < columns; j++) {
+                a1[i * columns + j] = iDep.getPixelValue(j, i);
             }
         }
 
-        for (i = 0; i < lignes; ++i) {
-            icolonnes = i * colonnes;
-            icol_1 = icolonnes - 1;
-            icol_2 = icolonnes - 2;
-            a2[icolonnes] = an1 * a1[icolonnes];
-            a2[icolonnes + 1] = an1 * a1[icolonnes + 1]
-                    + an2 * a1[icolonnes] - ad1 * a2[icolonnes];
-            for (j = 2; j < colonnes; ++j) {
-                a2[icolonnes + j] = an1 * a1[icolonnes + j] + an2 * a1[icol_1 + j]
+        for (i = 0; i < lines; ++i) {
+            iColumns = i * columns;
+            icol_1 = iColumns - 1;
+            icol_2 = iColumns - 2;
+            a2[iColumns] = an1 * a1[iColumns];
+            a2[iColumns + 1] = an1 * a1[iColumns + 1]
+                    + an2 * a1[iColumns] - ad1 * a2[iColumns];
+            for (j = 2; j < columns; ++j) {
+                a2[iColumns + j] = an1 * a1[iColumns + j] + an2 * a1[icol_1 + j]
                         - ad1 * a2[icol_1 + j] - ad2 * a2[icol_2 + j];
             }
         }
 
-        for (i = 0; i < lignes; ++i) {
-            icolonnes = i * colonnes;
-            icol_1 = icolonnes + 1;
-            icol_2 = icolonnes + 2;
-            a3[icolonnes + col_1] = 0;
-            a3[icolonnes + col_2] = an3 * a1[icolonnes + col_1];
-            for (j = col_3; j >= 0; --j) {
-                a3[icolonnes + j] = an3 * a1[icol_1 + j] + an4 * a1[icol_2 + j]
+        for (i = 0; i < lines; ++i) {
+            iColumns = i * columns;
+            icol_1 = iColumns + 1;
+            icol_2 = iColumns + 2;
+            a3[iColumns + col1] = 0;
+            a3[iColumns + col2] = an3 * a1[iColumns + col1];
+            for (j = col3; j >= 0; --j) {
+                a3[iColumns + j] = an3 * a1[icol_1 + j] + an4 * a1[icol_2 + j]
                         - ad1 * a3[icol_1 + j] - ad2 * a3[icol_2 + j];
             }
         }
 
-        icol_1 = lignes * colonnes;
+        icol_1 = lines * columns;
 
         for (i = 0; i < icol_1; ++i) {
             a2[i] += a3[i];
@@ -961,72 +935,72 @@ public class ActiveContour {
         /*
          * columns top - downn
          */
-        for (j = 0; j < colonnes; ++j) {
+        for (j = 0; j < columns; ++j) {
             a3[j] = 0;
-            a3[colonnes + j] = an11 * a2[j] - ad1 * a3[j];
-            for (i = 2; i < lignes; ++i) {
-                a3[i * colonnes + j] = an11 * a2[(i - 1) * colonnes + j]
-                        - ad1 * a3[(i - 1) * colonnes + j] - ad2 * a3[(i - 2) * colonnes + j];
+            a3[columns + j] = an11 * a2[j] - ad1 * a3[j];
+            for (i = 2; i < lines; ++i) {
+                a3[i * columns + j] = an11 * a2[(i - 1) * columns + j]
+                        - ad1 * a3[(i - 1) * columns + j] - ad2 * a3[(i - 2) * columns + j];
             }
         }
 
         /*
          * columns down top
          */
-        for (j = 0; j < colonnes; ++j) {
-            a4[lig_1 * colonnes + j] = 0;
-            a4[(lig_2 * colonnes) + j] = -an11 * a2[lig_1 * colonnes + j]
-                    - ad1 * a4[lig_1 * colonnes + j];
-            for (i = lig_3; i >= 0; --i) {
-                a4[i * colonnes + j] = -an11 * a2[(i + 1) * colonnes + j]
-                        - ad1 * a4[(i + 1) * colonnes + j] - ad2 * a4[(i + 2) * colonnes + j];
+        for (j = 0; j < columns; ++j) {
+            a4[line1 * columns + j] = 0;
+            a4[(line2 * columns) + j] = -an11 * a2[line1 * columns + j]
+                    - ad1 * a4[line1 * columns + j];
+            for (i = line3; i >= 0; --i) {
+                a4[i * columns + j] = -an11 * a2[(i + 1) * columns + j]
+                        - ad1 * a4[(i + 1) * columns + j] - ad2 * a4[(i + 2) * columns + j];
             }
         }
 
-        icol_1 = colonnes * lignes;
+        icol_1 = columns * lines;
         for (i = 0; i < icol_1; ++i) {
             a3[i] += a4[i];
         }
 
-        for (i = 0; i < lignes; ++i) {
-            for (j = 0; j < colonnes; ++j) {
-                nf_gry[i * colonnes + j] = a3[i * colonnes + j];
+        for (i = 0; i < lines; ++i) {
+            for (j = 0; j < columns; ++j) {
+                nf_gry[i * columns + j] = a3[i * columns + j];
             }
         }
 
         /*
          * SECOND STEP X-GRADIENT
          */
-        for (i = 0; i < lignes; ++i) {
-            for (j = 0; j < colonnes; ++j) {
-                a1[i * colonnes + j] = (int) (iDep.getPixel(j, i));
+        for (i = 0; i < lines; ++i) {
+            for (j = 0; j < columns; ++j) {
+                a1[i * columns + j] = (int) (iDep.getPixel(j, i));
             }
         }
 
-        for (i = 0; i < lignes; ++i) {
-            icolonnes = i * colonnes;
-            icol_1 = icolonnes - 1;
-            icol_2 = icolonnes - 2;
-            a2[icolonnes] = 0;
-            a2[icolonnes + 1] = an11 * a1[icolonnes];
-            for (j = 2; j < colonnes; ++j) {
-                a2[icolonnes + j] = an11 * a1[icol_1 + j]
+        for (i = 0; i < lines; ++i) {
+            iColumns = i * columns;
+            icol_1 = iColumns - 1;
+            icol_2 = iColumns - 2;
+            a2[iColumns] = 0;
+            a2[iColumns + 1] = an11 * a1[iColumns];
+            for (j = 2; j < columns; ++j) {
+                a2[iColumns + j] = an11 * a1[icol_1 + j]
                         - ad1 * a2[icol_1 + j] - ad2 * a2[icol_2 + j];
             }
         }
 
-        for (i = 0; i < lignes; ++i) {
-            icolonnes = i * colonnes;
-            icol_1 = icolonnes + 1;
-            icol_2 = icolonnes + 2;
-            a3[icolonnes + col_1] = 0;
-            a3[icolonnes + col_2] = -an11 * a1[icolonnes + col_1];
-            for (j = col_3; j >= 0; --j) {
-                a3[icolonnes + j] = -an11 * a1[icol_1 + j]
+        for (i = 0; i < lines; ++i) {
+            iColumns = i * columns;
+            icol_1 = iColumns + 1;
+            icol_2 = iColumns + 2;
+            a3[iColumns + col1] = 0;
+            a3[iColumns + col2] = -an11 * a1[iColumns + col1];
+            for (j = col3; j >= 0; --j) {
+                a3[iColumns + j] = -an11 * a1[icol_1 + j]
                         - ad1 * a3[icol_1 + j] - ad2 * a3[icol_2 + j];
             }
         }
-        icol_1 = lignes * colonnes;
+        icol_1 = lines * columns;
         for (i = 0; i < icol_1; ++i) {
             a2[i] += a3[i];
         }
@@ -1037,36 +1011,38 @@ public class ActiveContour {
         /*
          * columns top down
          */
-        for (j = 0; j < colonnes; ++j) {
+        for (j = 0; j < columns; ++j) {
             a3[j] = an1 * a2[j];
-            a3[colonnes + j] = an1 * a2[colonnes + j] + an2 * a2[j]
+            a3[columns + j] = an1 * a2[columns + j] + an2 * a2[j]
                     - ad1 * a3[j];
-            for (i = 2; i < lignes; ++i) {
-                a3[i * colonnes + j] = an1 * a2[i * colonnes + j] + an2 * a2[(i - 1) * colonnes + j]
-                        - ad1 * a3[(i - 1) * colonnes + j] - ad2 * a3[(i - 2) * colonnes + j];
+            for (i = 2; i < lines; ++i) {
+                a3[i * columns + j] = an1 * a2[i * columns + j] + an2 * a2[(i - 1) * columns + j]
+                        - ad1 * a3[(i - 1) * columns + j] - ad2 * a3[(i - 2) * columns + j];
             }
         }
 
         /*
          * columns down top
          */
-        for (j = 0; j < colonnes; ++j) {
-            a4[lig_1 * colonnes + j] = 0;
-            a4[lig_2 * colonnes + j] = an3 * a2[lig_1 * colonnes + j] - ad1 * a4[lig_1 * colonnes + j];
-            for (i = lig_3; i >= 0; --i) {
-                a4[i * colonnes + j] = an3 * a2[(i + 1) * colonnes + j] + an4 * a2[(i + 2) * colonnes + j]
-                        - ad1 * a4[(i + 1) * colonnes + j] - ad2 * a4[(i + 2) * colonnes + j];
+        for (j = 0; j < columns; ++j) {
+            a4[line1 * columns + j] = 0;
+            a4[line2 * columns + j] = an3 * a2[line1 * columns + j] - ad1 * a4[line1 * columns + j];
+            for (i = line3; i >= 0; --i) {
+                a4[i * columns + j] = an3 * a2[(i + 1) * columns + j] + an4 * a2[(i + 2) * columns + j]
+                        - ad1 * a4[(i + 1) * columns + j] - ad2 * a4[(i + 2) * columns + j];
             }
         }
 
-        icol_1 = colonnes * lignes;
+        icol_1 = columns * lines;
         for (i = 0; i < icol_1; ++i) {
             a3[i] += a4[i];
         }
 
-        for (i = 0; i < lignes; i++) {
-            for (j = 0; j < colonnes; j++) {
-                nf_grx[i * colonnes + j] = a3[i * colonnes + j];
+        float[] nf_grx = new float[nmem];
+
+        for (i = 0; i < lines; i++) {
+            for (j = 0; j < columns; j++) {
+                nf_grx[i * columns + j] = a3[i * columns + j];
             }
         }
 
@@ -1079,19 +1055,19 @@ public class ActiveContour {
         /*
          * computatopn of the magnitude
          */
-        for (i = 0; i < lignes; i++) {
-            for (j = 0; j < colonnes; j++) {
-                a2[i * colonnes + j] = nf_gry[i * colonnes + j];
+        for (i = 0; i < lines; i++) {
+            for (j = 0; j < columns; j++) {
+                a2[i * columns + j] = nf_gry[i * columns + j];
             }
         }
-        icol_1 = colonnes * lignes;
+        icol_1 = columns * lines;
         for (i = 0; i < icol_1; ++i) {
             a2[i] = (float) Math.sqrt((a2[i] * a2[i]) + (a3[i] * a3[i]));
         }
         /*
          * THIRD STEP : the norm is done
          */
-        result_array = new byte[nmem];
+        byte[] result_array = new byte[nmem];
 
         //Recherche des niveaux min et max du gradiant
         double min = a2[0];
@@ -1104,6 +1080,7 @@ public class ActiveContour {
                 max = a2[i];
             }
         }
+
 
         //Normalisation de gradient de 0 a 255
         for (i = 0; i < nmem; ++i) {
@@ -1124,7 +1101,7 @@ public class ActiveContour {
     public double process() {
         int i;
         double force;
-        Point2d displ = new Point2d();
+        PixelPos displ = new PixelPos();
         double maxforce = 0.0;
         double som = 0.0;
         double seuil = configuration.getGradThreshold();
@@ -1145,14 +1122,14 @@ public class ActiveContour {
         block = 0;
         elimination = 0;
         for (i = 0; i < NPT; i++) {
-            displ.x = 0.0;
-            displ.y = 0.0;
+            displ.x = 0f;
+            displ.y = 0f;
             displ = searchTheClosestEdge(i, seuil, dist_plus, dist_minus, -1);
 
             force = Math.sqrt(Math.pow(displ.x, 2.0) + Math.pow(displ.y, 2.0));
             if (force > DivForce) {
-                deplace[i].x = DivForce * (displ.x / force);
-                deplace[i].y = DivForce * (displ.y / force);
+                deplace[i].x = (float) (DivForce * (displ.x / force));
+                deplace[i].y = (float) (DivForce * (displ.y / force));
             } else {
                 deplace[i].x = displ.x;
                 deplace[i].y = displ.y;
@@ -1187,27 +1164,17 @@ public class ActiveContour {
      * @return binarised image (black=object inside snake)
      */
     public ByteProcessor segmentation(int wi, int he, int col) {
-        Point2d pos;
-        Point2d norm;
-        Point2d ref;
-        int top;
-        int left;
-        int right;
-        int bottom;
-        int i;
-        int j;
-        int x;
-        int y;
+
+        PixelPos pos = new PixelPos();
+        PixelPos norm = new PixelPos();
+        PixelPos ref = new PixelPos();
+        int top, left, right, bottom;
+        int i, j;
+        int x, y;
         int count;
-        double bden;
-        double bnum;
-        double bres;
+        double bden, bnum, bres;
         double lnorm;
         double ares;
-
-        pos = new Point2d();
-        norm = new Point2d();
-        ref = new Point2d();
 
         ByteProcessor res = new ByteProcessor(wi, he);
         //res.invert();
@@ -1261,19 +1228,18 @@ public class ActiveContour {
      * @param pos the point
      * @return inside ?
      */
-    boolean inside(Point2d pos) {
+    boolean inside(PixelPos pos) {
         int count;
-        int i;
         double bden;
         double bnum;
         double bres;
         double ares;
         double lnorm;
-        Point2d norm = new Point2d();
-        Point2d ref = new Point2d();
+        PixelPos norm = new PixelPos();
+        PixelPos ref = new PixelPos();
 
-        ref.x = 0.0;
-        ref.y = 0.0;
+        ref.x = 0f;
+        ref.y = 0f;
         norm.x = ref.x - pos.x;
         norm.y = ref.y - pos.y;
         lnorm = Math.sqrt(norm.x * norm.x + norm.y * norm.y);
@@ -1281,7 +1247,7 @@ public class ActiveContour {
         norm.y /= lnorm;
 
         count = 0;
-        for (i = 0; i < NPT - 1; i++) {
+        for (int i = 0; i < NPT - 1; i++) {
             bden = (-norm.x * points[i + 1].y + norm.x * points[i].y + norm.y * points[i + 1].x - norm.y * points[i].x);
             bnum = (-norm.x * pos.y + norm.x * points[i].y + norm.y * pos.x - norm.y * points[i].x);
             if (bden != 0) {
@@ -1300,7 +1266,7 @@ public class ActiveContour {
             }
         }
         // last point
-        i = NPT - 1;
+        int i = NPT - 1;
         bden = (-norm.x * points[0].y + norm.x * points[i].y + norm.y * points[0].x - norm.y * points[i].x);
         bnum = (-norm.x * pos.y + norm.x * points[i].y + norm.y * pos.x - norm.y * points[i].x);
         if (bden != 0) {
