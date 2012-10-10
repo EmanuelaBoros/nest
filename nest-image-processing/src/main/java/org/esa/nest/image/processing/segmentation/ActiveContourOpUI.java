@@ -28,10 +28,20 @@ import org.esa.nest.util.DialogUtils;
 public class ActiveContourOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
-    private final JLabel highThresholdLabel = new JLabel("HighThreshold");
-    private final JTextField highThreshold = new JTextField("");
-    private final JLabel lowThresholdLabel = new JLabel("LowThreshold");
-    private final JTextField lowThreshold = new JTextField("");
+    private final JLabel stepLabel = new JLabel("Step");
+    private final JTextField step = new JTextField("");
+    // threshold of edges
+    private final JLabel gradientThresholdLabel = new JLabel("Gradient Threshold");
+    private final JTextField gradientThreshold = new JTextField("");
+    // how far to look for edges
+    private final JLabel maxDistanceLabel = new JLabel("Maximum Distance");
+    private final JTextField maxDistance = new JTextField("");
+    // maximum displacement
+    private final JLabel maxDisplacementLabel = new JLabel("Maximum Displacement");
+    private final JTextField maxDisplacement = new JTextField("");
+    // regularization factors, min and max
+    private final JLabel dRegularizationLabel = new JLabel("Regularization Factor");
+    private final JTextField dRegularization = new JTextField("");
 
     @Override
     public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap,
@@ -47,8 +57,11 @@ public class ActiveContourOpUI extends BaseOperatorUI {
     @Override
     public void initParameters() {
         OperatorUIUtils.initBandList(bandList, getBandNames());
-        highThreshold.setText(String.valueOf(paramMap.get("highThreshold")));
-        lowThreshold.setText(String.valueOf(paramMap.get("lowThreshold")));
+        gradientThreshold.setText(String.valueOf(paramMap.get("gradientThreshold")));
+        maxDistance.setText(String.valueOf(paramMap.get("maxDistance")));
+        maxDisplacement.setText(String.valueOf(paramMap.get("maxDisplacement")));
+        step.setText(String.valueOf(paramMap.get("step")));
+        dRegularization.setText(String.valueOf(paramMap.get("dRegularization")));
     }
 
     @Override
@@ -60,8 +73,11 @@ public class ActiveContourOpUI extends BaseOperatorUI {
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
 
-        paramMap.put("highThreshold", Float.parseFloat(highThreshold.getText()));
-        paramMap.put("lowThreshold", Float.parseFloat(lowThreshold.getText()));
+        paramMap.put("GradientThreshold", Integer.parseInt(gradientThreshold.getText()));
+        paramMap.put("MaximumDistance", Integer.parseInt(maxDistance.getText()));
+        paramMap.put("MaximumDisplacement", Double.parseDouble(maxDisplacement.getText()));
+        paramMap.put("Step", Integer.parseInt(step.getText()));
+        paramMap.put("RegularizationFactor", Double.parseDouble(dRegularization.getText()));
     }
 
     private JComponent createPanel() {
@@ -71,9 +87,16 @@ public class ActiveContourOpUI extends BaseOperatorUI {
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
         gbc.gridy++;
-        DialogUtils.addComponent(contentPane, gbc, highThresholdLabel, highThreshold);
+        DialogUtils.addComponent(contentPane, gbc, gradientThresholdLabel, gradientThreshold);
         gbc.gridy++;
-        DialogUtils.addComponent(contentPane, gbc, lowThresholdLabel, lowThreshold);
+        DialogUtils.addComponent(contentPane, gbc, maxDisplacementLabel, maxDisplacement);
+        gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, maxDistanceLabel, maxDistance);
+        gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, stepLabel, step);
+        gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, dRegularizationLabel, dRegularization);
+        gbc.gridy++;
         final int savedY = gbc.gridy;
         gbc.gridy++;
         gbc.gridy = savedY;
@@ -81,8 +104,11 @@ public class ActiveContourOpUI extends BaseOperatorUI {
 
         contentPane.add(new JPanel(), gbc);
 
-        DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, true);
-        DialogUtils.enableComponents(highThresholdLabel, highThreshold, true);
+        DialogUtils.enableComponents(gradientThresholdLabel, gradientThreshold, true);
+        DialogUtils.enableComponents(maxDisplacementLabel, maxDisplacement, true);
+        DialogUtils.enableComponents(maxDistanceLabel, maxDistance, true);
+        DialogUtils.enableComponents(stepLabel, step, true);
+        DialogUtils.enableComponents(dRegularizationLabel, dRegularization, true);
         return contentPane;
     }
 }

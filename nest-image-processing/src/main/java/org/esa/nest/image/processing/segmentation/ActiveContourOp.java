@@ -87,39 +87,25 @@ public class ActiveContourOp extends Operator {
     private int filterSizeX = 3;
     private int filterSizeY = 3;
     private static ImagePlus fullImagePlus;
-//    private static ByteProcessor fullByteProcessor;
-    /**
-     *
-     */
-    Roi originalROI = null;
-    Color colorDraw = Color.white;
-    /**
-     *
-     */
     ActiveContourConfigurationDriver configDriver;
     @Parameter(description = "Number of Iterations", defaultValue = "100", label = "nIterations")
     int nIterations = 50;
     // step to display snake
+    @Parameter(description = "Step", defaultValue = "1", label = "Step")
     int step = 1;
     // threshold of edges
-    @Parameter(description = "Gradient threshold", defaultValue = "100", label = "GradientThreshold")
+    @Parameter(description = "Gradient Threshold", defaultValue = "100", label = "GradientThreshold")
     private int gradientThreshold = 5;
     // how far to look for edges
-    int DistMAX = Prefs.getInt("ABSnake_DistSearch.int", 100);
+    @Parameter(description = "Maximum Distance", defaultValue = "100", label = "MaximumDistance")
+    int maxDistance = Prefs.getInt("ABSnake_DistSearch.int", 100);
     // maximum displacement
-    double force = 5.0;
+    @Parameter(description = "Maximum Displacement", defaultValue = "2.0", label = "MaximumDisplacement")
+    double maxDisplacement = 5.0;
     // regularization factors, min and max
+    @Parameter(description = "Regularization Factor", defaultValue = "5.0", label = "RegularizationFactor")
     double dRegularization = 5.0;
     double dMinRegularization, dMaxRegularization;
-    // first and last slice to process
-    int slice1, slice2;
-    // misc options
-    boolean showgrad = false;
-    boolean savecoords = false;
-    boolean createsegimage = false;
-    boolean advanced = false;
-    boolean propagate = true;
-    boolean movie = false;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -252,9 +238,6 @@ public class ActiveContourOp extends Operator {
             ImageProcessor imageProcessor = fullImagePlus.getProcessor().convertToByte(true);
             ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
             contrastEnhancer.equalize(imageProcessor);
-            JOptionPane.showMessageDialog(null, imageProcessor.getMax()
-                    + ", " + imageProcessor.getMin(),
-                    "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
 
             fullImagePlus.setProcessor(imageProcessor);
 
@@ -283,13 +266,12 @@ public class ActiveContourOp extends Operator {
                 }
             }
             RoiManager managerROI = RoiManager.getInstance();
+
             if (currentROIs.size() > 0 && managerROI == null) {
                 managerROI = new RoiManager();
                 managerROI.setVisible(true);
 
                 final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-//                ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
                 for (int i = 0; i < currentROIs.size(); i++) {
 
@@ -301,13 +283,13 @@ public class ActiveContourOp extends Operator {
                     ImagePlus currentImagePlus = new ImagePlus(sourceBand.getName() + "#" + i,
                             roiImageProcessor);
                     currentImagePlus.setProcessor(roiImageProcessor);
-
                     if (roiImageProcessor.getRoi() == null) {
                         IJ.showMessage("Roi required");
                     } else {
                         managerROI.add(currentImagePlus,
                                 new Roi(roiImageProcessor.getRoi()), 0);
                     }
+
                     class ActiveContourThread extends Thread {
 
                         ImagePlus currentImagePlus;
@@ -318,17 +300,18 @@ public class ActiveContourOp extends Operator {
                                 RoiManager managerROI) {
                             this.currentImagePlus = currentImagePlus;
                             this.managerROI = managerROI;
+                            currentImagePlus.show();
                         }
 
                         @Override
                         public void run() {
                             synchronized (lock) {
-//                                try {
-                                currentImagePlus.show();
-
                                 while (!hasROIs) {
                                     int nbRois = managerROI.getCount();
+
                                     if (nbRois > 1) {
+                                        JOptionPane.showMessageDialog(null, "saving.. " + nbRois,
+                                                "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
                                         final Roi[] originalROIs = managerROI.getRoisAsArray();
                                         for (int i = 1; i < nbRois; i++) {
                                             ActiveContour currentActivecontour = processActiveContour(
@@ -416,15 +399,15 @@ public class ActiveContourOp extends Operator {
             imagePlus.show();
         }
 
-        double InvAlphaD = configDriver.getInvAlphaD(false);
+        double invAlphaD = configDriver.getInvAlphaD(false);
         double regMax = configDriver.getReg(false);
         double regMin = configDriver.getReg(true);
-        double DisplMax = configDriver.getMaxDisplacement(false);
+        double maxDisplacement = configDriver.getMaxDisplacement(false);
         double mul = configDriver.getStep();
 
         ActiveContourConfiguration config = new ActiveContourConfiguration(
-                gradientThreshold, DisplMax,
-                DistMAX, regMin, regMax, 1.0 / InvAlphaD);
+                gradientThreshold, maxDisplacement,
+                maxDistance, regMin, regMax, 1.0 / invAlphaD);
         activeContour.setConfiguration(config);
 
         activeContour.computeGradient(roiImageProcessor);
@@ -438,7 +421,7 @@ public class ActiveContourOp extends Operator {
                 break;
             }
             dist = activeContour.process();
-            if ((dist >= dist0) && (dist < force)) {
+            if ((dist >= dist0) && (dist < this.maxDisplacement)) {
                 activeContour.computeGradient(roiImageProcessor);
                 config.update(mul);
             }
