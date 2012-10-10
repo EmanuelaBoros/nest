@@ -23,9 +23,9 @@ import com.vividsolutions.jts.geom.Polygon;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
-import ij.gui.GenericDialog;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
+import ij.plugin.ContrastEnhancer;
 import ij.plugin.frame.RoiManager;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -249,6 +249,14 @@ public class ActiveContourOp extends Operator {
             fullBufferedImage.setData(fullRenderedImage.getData());
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+            ImageProcessor imageProcessor = fullImagePlus.getProcessor().convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(imageProcessor);
+            JOptionPane.showMessageDialog(null, imageProcessor.getMax()
+                    + ", " + imageProcessor.getMin(),
+                    "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
+
+            fullImagePlus.setProcessor(imageProcessor);
 
             ProductNodeGroup<VectorDataNode> productNodeGroup = sourceProduct.getVectorDataGroup();
             for (int i = 0; i < productNodeGroup.getNodeCount(); i++) {
@@ -281,14 +289,14 @@ public class ActiveContourOp extends Operator {
 
                 final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
-                ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+//                ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
                 for (int i = 0; i < currentROIs.size(); i++) {
 
                     Roi currentROI = currentROIs.get(i);
-                    fullByteProcessor.setRoi(new Roi(currentROI.getBounds()));
+                    fullImageProcessor.setRoi(new Roi(currentROI.getBounds()));
 
-                    ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+                    ImageProcessor roiImageProcessor = fullImageProcessor.crop();
 
                     ImagePlus currentImagePlus = new ImagePlus(sourceBand.getName() + "#" + i,
                             roiImageProcessor);
@@ -300,26 +308,13 @@ public class ActiveContourOp extends Operator {
                         managerROI.add(currentImagePlus,
                                 new Roi(roiImageProcessor.getRoi()), 0);
                     }
-
-                    //                    Roi roi = new Roi(currentROI.getBounds().x + currentROI.getBounds().x / 2,
-                    //                            currentROI.getBounds().y + currentROI.getBounds().y / 2, currentROI.getBounds().width / 2,
-                    //                            currentROI.getBounds().height / 2, currentROI.getRoundRectArcSize() / 2);
-                    //                    ActiveContour currentActivecontour = processActiveContour(currentImagePlus,
-                    //                            roi, roiImageProcessor, i,
-                    //                            x0 + "," + y0);
-                    //
-                    //                    roiImageProcessor = currentActivecontour.drawContour(roiImageProcessor, Color.white, 2);
-                    //                    Roi resultROI = currentActivecontour.createROI();
-                    //                    currentImagePlus.setRoi(resultROI);
-                    //                    currentImagePlus.setProcessor(roiImageProcessor);
-                    //                    currentImagePlus.show();
-                    class ThreadSafe extends Thread {
+                    class ActiveContourThread extends Thread {
 
                         ImagePlus currentImagePlus;
                         RoiManager managerROI;
                         public boolean hasROIs = false;
 
-                        public ThreadSafe(ImagePlus currentImagePlus,
+                        public ActiveContourThread(ImagePlus currentImagePlus,
                                 RoiManager managerROI) {
                             this.currentImagePlus = currentImagePlus;
                             this.managerROI = managerROI;
@@ -334,15 +329,17 @@ public class ActiveContourOp extends Operator {
                                 while (!hasROIs) {
                                     int nbRois = managerROI.getCount();
                                     if (nbRois > 1) {
-                                        JOptionPane.showMessageDialog(null, nbRois + " ROIs",
-                                                "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
-
                                         final Roi[] originalROIs = managerROI.getRoisAsArray();
                                         for (int i = 1; i < nbRois; i++) {
                                             ActiveContour currentActivecontour = processActiveContour(
                                                     currentImagePlus,
                                                     originalROIs[i], currentImagePlus.getProcessor(), i,
                                                     x0 + "," + y0);
+                                            //                    roiImageProcessor = currentActivecontour.drawContour(roiImageProcessor, Color.white, 2);
+                                            //                    Roi resultROI = currentActivecontour.createROI();
+                                            //                    currentImagePlus.setRoi(resultROI);
+                                            //                    currentImagePlus.setProcessor(roiImageProcessor);
+                                            //                    currentImagePlus.show();
                                             hasROIs = true;
                                         }
                                     }
@@ -356,7 +353,7 @@ public class ActiveContourOp extends Operator {
                         }
                     }
 
-                    ThreadSafe thread = new ThreadSafe(currentImagePlus,
+                    ActiveContourThread thread = new ActiveContourThread(currentImagePlus,
                             managerROI);
                     thread.start();
                     synchronized (lock) {
@@ -415,7 +412,6 @@ public class ActiveContourOp extends Operator {
         activeContour.initActiveContour(currentROI);
         activeContour.setOriginalImage(imagePlus.getProcessor());
 
-        IJ.showStatus("Calculating snake...");
         if (step > 0) {
             imagePlus.show();
         }
@@ -429,7 +425,7 @@ public class ActiveContourOp extends Operator {
         ActiveContourConfiguration config = new ActiveContourConfiguration(
                 gradientThreshold, DisplMax,
                 DistMAX, regMin, regMax, 1.0 / InvAlphaD);
-        activeContour.setConfig(config);
+        activeContour.setConfiguration(config);
 
         activeContour.computeGradient(roiImageProcessor);
 
@@ -451,7 +447,7 @@ public class ActiveContourOp extends Operator {
             if ((step > 0) && ((i % step) == 0)) {
                 IJ.showStatus("Show intermediate result (iteration n" + (i + 1) + ")");
                 ByteProcessor image2 = (ByteProcessor) roiImageProcessor.duplicate();
-                activeContour.drawContour(image2, Color.white, 1);
+                activeContour.drawContour(image2, Color.WHITE, 3);
                 imagePlus.setProcessor(image2);
                 imagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
                         + " (iteration n" + (i + 1) + ")");

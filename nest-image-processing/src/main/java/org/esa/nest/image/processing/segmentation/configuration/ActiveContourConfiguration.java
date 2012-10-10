@@ -5,7 +5,8 @@ package org.esa.nest.image.processing.segmentation.configuration;
  *
  * @author Thomas
  * @since 11 May 2004
- * @author Emanuela Boros @updated September 2012
+ * @author Emanuela Boros
+ * @updated September 2012
  */
 public class ActiveContourConfiguration {
 
@@ -17,14 +18,14 @@ public class ActiveContourConfiguration {
     private double alphaDeriche;
 
     /**
-     * Constructor for the snakeConfig object
+     * Construct the active contour configuration
      *
-     * @param gt Description of the Parameter
-     * @param md Description of the Parameter
-     * @param rmin Description of the Parameter
-     * @param rmax Description of the Parameter
-     * @param ms Description of the Parameter
-     * @param alpha Description of the Parameter
+     * @param gradThreshold the gradient threshold
+     * @param maxDisplacement the maximum displacement
+     * @param maxSearch maximum search
+     * @param regMin the minimum reg
+     * @param regMax the maximum reg
+     * @param alphaDeriche alpha parameter for Deriche filtering
      */
     public ActiveContourConfiguration(double gradThreshold, double maxDisplacement,
             double maxSearch, double regMin, double regMax, double alphaDeriche) {
@@ -106,14 +107,12 @@ public class ActiveContourConfiguration {
     }
 
     /**
-     * Description of the Method
+     * Update parameters
      *
-     * @param multiply Description of the Parameter
+     * @param multiply the parameter of the update
      */
     public void update(double multiply) {
         alphaDeriche /= multiply;
-        //maxDisplacement *= mul;
-        //maxSearch *= mul;
         regMax *= multiply;
         regMin *= multiply;
     }

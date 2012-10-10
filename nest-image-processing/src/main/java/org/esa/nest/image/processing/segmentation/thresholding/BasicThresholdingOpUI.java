@@ -27,6 +27,13 @@ import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
+/**
+ * The UI for the thresholding methods. The implemented methods are Hysteresis,
+ * MaximumEntropy, MixtureModeling and Otsu.
+ *
+ * @author Emanuela Boros
+ * @since October 2012
+ */
 public class BasicThresholdingOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();

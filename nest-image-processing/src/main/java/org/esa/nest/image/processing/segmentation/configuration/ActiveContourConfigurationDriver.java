@@ -5,7 +5,8 @@ package org.esa.nest.image.processing.segmentation.configuration;
  *
  * @author Thomas
  * @since 11 May 2004
- * @author Emanuela Boros @updated September 2012
+ * @author Emanuela Boros
+ * @updated September 2012
  */
 public class ActiveContourConfigurationDriver {
 
@@ -18,7 +19,7 @@ public class ActiveContourConfigurationDriver {
     private double dStep;
 
     /**
-     * Constructor for the snakeConfig object
+     * Constructor for the ActiveContourConfigurationDriver
      */
     public ActiveContourConfigurationDriver() {
         dMaxDisplacement0 = 2.0;

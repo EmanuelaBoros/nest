@@ -40,6 +40,7 @@ import org.esa.nest.gpf.OperatorUtils;
  * MixtureModeling and Otsu.
  *
  * @author Emanuela Boros
+ * @since October 2012
  */
 @OperatorMetadata(alias = "BasicThresholding",
 category = "SAR Tools\\Image Processing",
