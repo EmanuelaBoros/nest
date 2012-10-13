@@ -110,10 +110,10 @@
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>ImageProcessingGroup</parent>
-            <text>SIFT Keypoint</text>
+            <text>SIFT Keypoints Detector</text>
             <operatorName>SIFTKeypoint</operatorName>
-            <dialogTitle>SIFT Keypoint</dialogTitle>
-            <shortDescr>Invoke SIFT Keypoint on a single product</shortDescr>
+            <dialogTitle>SIFT Keypoints Detector</dialogTitle>
+            <shortDescr>Invoke SIFT Keypoints Detector on a single product</shortDescr>
             <targetProductNameSuffix>_Sft</targetProductNameSuffix>
         </action>
         <action>
@@ -122,11 +122,11 @@
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>ImageProcessingGroup</parent>
-            <text>ASIFT Keypoint</text>
+            <text>ASIFT Keypoints Detector</text>
             <operatorName>SIFTKeypoint</operatorName>
-            <dialogTitle>ASIFT Keypoint</dialogTitle>
-            <shortDescr>Invoke ASIFT Keypoint on a single product</shortDescr>
-            <targetProductNameSuffix>_Sft</targetProductNameSuffix>
+            <dialogTitle>ASIFT Keypoints Detector</dialogTitle>
+            <shortDescr>Invoke ASIFT Keypoints Detector on a single product</shortDescr>
+            <targetProductNameSuffix>_ASft</targetProductNameSuffix>
         </action>
         <action>
             <id>MaximumEntropyThresholdingOp</id>
@@ -134,10 +134,10 @@
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>ImageProcessingGroup</parent>
-            <text>MaximumEntropyThresholdingOp</text>
+            <text>Maximum Entropy Thresholding</text>
             <operatorName>MaximumEntropyThresholding</operatorName>
-            <dialogTitle>MaximumEntropyThresholdingOp</dialogTitle>
-            <shortDescr>Invoke MaximumEntropyThresholdingOp on a single product</shortDescr>
+            <dialogTitle>Maximum Entropy Thresholding</dialogTitle>
+            <shortDescr>Invoke MaximumEntropy Thresholding on a single product</shortDescr>
             <targetProductNameSuffix>_Met</targetProductNameSuffix>
         </action>
         <action>
@@ -146,10 +146,10 @@
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>ImageProcessingGroup</parent>
-            <text>BasicThresholdingOp</text>
+            <text>Basic Thresholding Methods</text>
             <operatorName>BasicThresholding</operatorName>
-            <dialogTitle>BasicThresholdingOp</dialogTitle>
-            <shortDescr>Invoke BasicThresholdingOp on a single product</shortDescr>
+            <dialogTitle>Basic Thresholding Methods</dialogTitle>
+            <shortDescr>Invoke Basic Thresholding Methods on a single product</shortDescr>
             <targetProductNameSuffix>_Met</targetProductNameSuffix>
         </action>
         
@@ -159,10 +159,22 @@
             <class>org.esa.nest.dat.actions.OperatorAction</class>
             <icon>esaIcon</icon>
             <parent>ImageProcessingGroup</parent>
-            <text>DericheEdgeDetector</text>
+            <text>Deriche Edge Detector</text>
             <operatorName>DericheEdgeDetector</operatorName>
             <dialogTitle>Deriche Edge Detector</dialogTitle>
             <shortDescr>Invoke Deriche Edge Detector on a single product</shortDescr>
+            <targetProductNameSuffix>_Ded</targetProductNameSuffix>
+        </action>
+        <action>
+            <id>MSEROp</id>
+            <helpId>MSEROp</helpId>
+            <class>org.esa.nest.dat.actions.OperatorAction</class>
+            <icon>esaIcon</icon>
+            <parent>ImageProcessingGroup</parent>
+            <text>MSER Detector</text>
+            <operatorName>MSER</operatorName>
+            <dialogTitle>MSER Detector</dialogTitle>
+            <shortDescr>Invoke MSER Detector on a single product</shortDescr>
             <targetProductNameSuffix>_Ded</targetProductNameSuffix>
         </action>
     </extension>

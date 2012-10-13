@@ -78,6 +78,20 @@ public class BasicThresholdingOp extends Operator {
     private int filterSizeY = 3;
     private static ByteProcessor fullByteProcessor;
 
+    /**
+     * @return the operator
+     */
+    public String getOperator() {
+        return operator;
+    }
+
+    /**
+     * @param operator the operator to set
+     */
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
     public static class Method {
 
         static final String Hysteresis = "Hysteresis";
@@ -160,7 +174,7 @@ public class BasicThresholdingOp extends Operator {
             final int y0 = targetTileRectangle.y;
             final int w = targetTileRectangle.width;
             final int h = targetTileRectangle.height;
-
+            System.out.println("Compute tile");
             final Rectangle sourceTileRectangle = getSourceTileRectangle(x0, y0, w, h);
             Tile sourceRaster;
             final String[] srcBandNames = targetBandNameToSourceBandName.get(targetBand.getName());
@@ -169,17 +183,18 @@ public class BasicThresholdingOp extends Operator {
             if (sourceRaster == null) {
                 throw new OperatorException("Cannot get source tile");
             }
-            if (operator.equals(Method.MixtureModeling)) {
+            if (getOperator().equals(Method.MixtureModeling)) {
                 computeThresholding(sourceBand, sourceRaster,
                         targetTile, x0, y0, w, h, pm,
                         ThresholdingTypeOperator.MixtureModeling, paramMap);
-            } else if (operator.equals(Method.MaximumEntropy)) {
+            } else if (getOperator().equals(Method.MaximumEntropy)) {
                 computeThresholding(sourceBand, sourceRaster,
                         targetTile, x0, y0, w, h, pm,
                         ThresholdingTypeOperator.MaximumEntropy, paramMap);
-            } else if (operator.equals(Method.Hysteresis)) {
+            } else if (getOperator().equals(Method.Hysteresis)) {
                 paramMap.put("lowThreshold", lowThreshold);
                 paramMap.put("highThreshold", highThreshold);
+                System.out.println("Compute Hysteresis");
                 computeThresholding(sourceBand, sourceRaster,
                         targetTile, x0, y0, w, h, pm,
                         ThresholdingTypeOperator.Hysteresis, paramMap);
@@ -240,10 +255,11 @@ public class BasicThresholdingOp extends Operator {
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+                float f1 = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),f1);
+                System.out.print(f1+",");
             }
+            System.out.println();
         }
     }
 
@@ -284,6 +300,14 @@ public class BasicThresholdingOp extends Operator {
         }
 
         return new Rectangle(sx0, sy0, sw, sh);
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        fullByteProcessor = null;
+        processed = false;
+        probabilityHistogram = null;
     }
 
     /**

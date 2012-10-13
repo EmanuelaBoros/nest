@@ -17,6 +17,7 @@ package org.esa.nest.image.processing.segmentation.thresholding;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.plugin.ContrastEnhancer;
 import ij.process.AutoThresholder;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -36,7 +37,6 @@ import org.esa.beam.framework.gpf.Tile;
 public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
 
     Hysteresis {
-
         private float highThreshold = 100f;
         private float lowThreshold = 10f;
         final static int MAX_VALUE = 256;
@@ -68,6 +68,9 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
 
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
             ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
 
             return getThresholdedImage(fullByteProcessor);
         }
@@ -215,7 +218,6 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         }
     },
     MaximumEntropy {
-
         @Override
         public ByteProcessor computeThresholdingOperator(final Band sourceBand, final Tile sourceRaster,
                 final Tile targetTile, final int x0, final int y0, final int w, final int h,
@@ -231,6 +233,9 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
             ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
 
             fullByteProcessor = getThresholdedImage(fullByteProcessor);
 
@@ -369,7 +374,6 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         }
     },
     MixtureModeling {
-
         int MAX_VALUE = 0;
         int MIN_VALUE = 256;
         public int N;
@@ -388,8 +392,12 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
 
             ImagePlus fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
             ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
+
             return getThresholdedImage(fullByteProcessor);
         }
 
@@ -641,7 +649,6 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         }
     },
     Otsu {
-
         private ImagePlus fullImagePlus;
         private ByteProcessor fullByteProcessor;
 
@@ -657,9 +664,12 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
             fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
 
+            fullImagePlus.show();
             return getThresholdedImage(fullByteProcessor);
         }
 

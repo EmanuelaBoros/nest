@@ -7,4 +7,5 @@ org.esa.nest.image.processing.segmentation.ActiveContourOp$Spi
 org.esa.nest.image.processing.segmentation.DericheEdgeDetectorOp$Spi
 org.esa.nest.image.processing.features.local.SIFTKeypointOp$Spi
 org.esa.nest.image.processing.features.local.ASIFTKeypointOp$Spi
-org.esa.nest.image.processing.segmentation.basic.BasicThresholdingOp$Spi
+org.esa.nest.image.processing.features.local.MSEROp$Spi
+org.esa.nest.image.processing.segmentation.thresholding.BasicThresholdingOp$Spi
