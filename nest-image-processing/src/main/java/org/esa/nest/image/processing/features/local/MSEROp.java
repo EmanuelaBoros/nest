@@ -20,6 +20,7 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
@@ -33,13 +34,14 @@ import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
-import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.MBFImage;
+import org.openimaj.image.analysis.watershed.Component;
+import org.openimaj.image.analysis.watershed.MergeTreeBuilder;
+import org.openimaj.image.analysis.watershed.feature.MomentFeature;
+import org.openimaj.image.feature.local.detector.mser.MSERFeatureGenerator;
 import org.openimaj.image.feature.local.engine.DoGSIFTEngine;
-import org.openimaj.image.feature.local.keypoints.Keypoint;
-import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 
 /**
  * This plug-in takes as parameters a gray scale image and two thresholds (low
@@ -47,10 +49,10 @@ import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
  *
  * @author Emanuela Boros
  */
-@OperatorMetadata(alias = "ASIFTKeypoint",
+@OperatorMetadata(alias = "MSER",
 category = "SAR Tools\\Image Processing",
-description = "ASIFTKeypoint")
-public class ASIFTKeypointOp extends Operator {
+description = "MSER")
+public class MSEROp extends Operator {
 
     public static float[] probabilityHistogram;
     final static int MAX_VALUE = 256;
@@ -82,8 +84,8 @@ public class ASIFTKeypointOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -163,7 +165,7 @@ public class ASIFTKeypointOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeSIFTKeypointList(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
+            computeMSER(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
 
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
@@ -189,7 +191,7 @@ public class ASIFTKeypointOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private synchronized void computeSIFTKeypointList(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeMSER(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
 
@@ -207,18 +209,26 @@ public class ASIFTKeypointOp extends Operator {
         BufferedImage bf = fullBufferedImage.getSubimage(srcTileRectangle.x, srcTileRectangle.y,
                 srcTileRectangle.width, srcTileRectangle.height);
         FImage crop = ImageUtilities.createFImage(bf);
+        MSERFeatureGenerator mser = new MSERFeatureGenerator(
+                MomentFeature.class);
+//        List<Component> features = mser.generateMSERs(crop);
+        List<MergeTreeBuilder> mergeTrees = mser.performWatershed(crop);
+//        for (Component c : features) {
+//            MomentFeature feature = c.getFeature(MomentFeature.class);
+//            crop.drawShape(feature.getEllipse(), RGBColour.WHITE);
+//        }
 
-        engine.getOptions().setGaussianSigma(lowThreshold);
-
-        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findFeatures(crop);
-
-        KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
-                new MBFImage(crop, crop, crop), fullLocalFeatureList);
-        MBFImage imageWithKeypoints =
-                kpv.drawPatches(new Float[]{1.0f, 0.0f, 0.0f}, new Float[]{0.0f, 1.0f, 0.0f});
+//        engine.getOptions().setGaussianSigma(lowThreshold);
+//
+//        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findFeatures(crop);
+//
+//        KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
+//                new MBFImage(crop, crop, crop), fullLocalFeatureList);
+//        MBFImage imageWithKeypoints =
+//                kpv.drawPatches(new Float[]{1.0f, 0.0f, 0.0f}, new Float[]{0.0f, 1.0f, 0.0f});
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance(imageWithKeypoints.toPackedARGBPixels());
+        final ProductData sourceData = ProductData.createInstance(crop.toPackedARGBPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;
@@ -282,8 +292,8 @@ public class ASIFTKeypointOp extends Operator {
     public static class Spi extends OperatorSpi {
 
         public Spi() {
-            super(ASIFTKeypointOp.class);
-            setOperatorUI(ASIFTKeypointOpUI.class);
+            super(MSEROp.class);
+            setOperatorUI(MSEROpUI.class);
         }
     }
 }

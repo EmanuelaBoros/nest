@@ -25,7 +25,7 @@ import org.esa.beam.framework.ui.AppContext;
 import org.esa.nest.gpf.OperatorUIUtils;
 import org.esa.nest.util.DialogUtils;
 
-public class ASIFTKeypointOpUI extends BaseOperatorUI {
+public class MSEROpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
     private final JLabel highThresholdLabel = new JLabel("HighThreshold");
