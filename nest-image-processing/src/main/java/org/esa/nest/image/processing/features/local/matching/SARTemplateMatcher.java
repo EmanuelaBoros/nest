@@ -94,10 +94,9 @@ public class SARTemplateMatcher implements TemplateMatcherEnforcement {
     /**
      * Compute the score at a point as the sum-squared difference between the
      * image and the template with the top-left at the given point. The
-     * {@link TemplateMatcher} will account for the offset to the centre of the
+     * SARTemplateMatcher will account for the offset to the centre of the
      * template internally.
      *
-     * @author Jonathon Hare (jsh2@ecs.soton.ac.uk)
      */
     public enum Mode {
 

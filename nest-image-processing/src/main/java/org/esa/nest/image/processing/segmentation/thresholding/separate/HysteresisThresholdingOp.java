@@ -77,8 +77,8 @@ public class HysteresisThresholdingOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -195,7 +195,7 @@ public class HysteresisThresholdingOp extends Operator {
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
 
-            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+//            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
             ImageStack stack = fullImagePlus.getStack();
             ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
@@ -236,9 +236,8 @@ public class HysteresisThresholdingOp extends Operator {
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+                float fValue = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), fValue);
             }
         }
     }

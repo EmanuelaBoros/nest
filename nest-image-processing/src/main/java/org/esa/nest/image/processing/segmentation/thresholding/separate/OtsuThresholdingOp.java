@@ -271,9 +271,8 @@ public class OtsuThresholdingOp extends Operator {
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+                float fValue = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), fValue);
             }
         }
     }

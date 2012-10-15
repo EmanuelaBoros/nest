@@ -246,9 +246,10 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         public ByteProcessor getThresholdedImage(ByteProcessor byteProcessor) {
 //            int[] hist = byteProcessor.getHistogram();
 //            int threshold = entropySplit(hist);
-            byteProcessor.setAutoThreshold(AutoThresholder.Method.MaxEntropy, false,
-                    ImageProcessor.RED_LUT);
-            byteProcessor.autoThreshold();
+            byteProcessor = (ByteProcessor) maximumEntropyThresholding(byteProcessor);
+//            byteProcessor.setAutoThreshold(AutoThresholder.Method.MaxEntropy, false,
+//                    ImageProcessor.RED_LUT);
+//            byteProcessor.autoThreshold();
             return byteProcessor;
         }
 

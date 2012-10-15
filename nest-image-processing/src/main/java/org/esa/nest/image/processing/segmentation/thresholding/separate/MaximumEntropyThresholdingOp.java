@@ -17,6 +17,7 @@ package org.esa.nest.image.processing.segmentation.thresholding.separate;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.plugin.ContrastEnhancer;
 import ij.process.AutoThresholder;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -72,8 +73,8 @@ public class MaximumEntropyThresholdingOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -183,8 +184,20 @@ public class MaximumEntropyThresholdingOp extends Operator {
 
         int threshold = 0;
         if (!processed) {
- 
+            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
+            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
+                    sourceBand.getSceneRasterHeight(),
+                    BufferedImage.TYPE_USHORT_GRAY);
+            fullBufferedImage.setData(fullRenderedImage.getData());
 
+            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
+            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
+
+            fullByteProcessor = (ByteProcessor) maximumEntropyThresholding(fullByteProcessor);
             processed = true;
         }
 
@@ -203,17 +216,14 @@ public class MaximumEntropyThresholdingOp extends Operator {
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+                float fValue = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), fValue);
             }
         }
     }
 
-   
-
     /**
-     * Hysteresis thresholding
+     * Maximum Entropy thresholding
      *
      * @param imageProcessor original image
      * @return thresholded image
@@ -229,57 +239,43 @@ public class MaximumEntropyThresholdingOp extends Operator {
     }
 
     /**
-     * Calculate maximum entropy split of a histogram.
+     * Calculate maximum entropy split of a histogram. Implements
+     * Kapur-Sahoo-Wong (Maximum Entropy) thresholding method Kapur J.N., Sahoo
+     * P.K., and Wong A.K.C. (1985) "A New Method for Gray-Level Picture
+     * Thresholding Using the Entropy of the Histogram" Graphical Models and
+     * Image Processing, 29(3): 273-285 M. Emre Celebi 06.15.2007 Ported to
+     * ImageJ plugin by G.Landini from E Celebi's fourier_0.8 routines
      *
-     * @param hist histogram to be thresholded.
+     * @param data histogram to be thresholded.
      *
      * @return index of the maximum entropy split.`
      */
     private int entropySplit(int[] data) {
 
-        // Implements Kapur-Sahoo-Wong (Maximum Entropy) thresholding method
-        // Kapur J.N., Sahoo P.K., and Wong A.K.C. (1985) "A New Method for
-        // Gray-Level Picture Thresholding Using the Entropy of the Histogram"
-        // Graphical Models and Image Processing, 29(3): 273-285
-        // M. Emre Celebi
-        // 06.15.2007
-        // Ported to ImageJ plugin by G.Landini from E Celebi's fourier_0.8 routines
         int threshold = -1;
-        int ih, it;
-        int first_bin;
-        int last_bin;
-        double tot_ent;  /*
-         * total entropy
-         */
-        double max_ent;  /*
-         * max entropy
-         */
-        double ent_back; /*
-         * entropy of the background pixels at a given threshold
-         */
-        double ent_obj;  /*
-         * entropy of the object pixels at a given threshold
-         */
-        double[] norm_histo = new double[data.length]; /*
-         * normalized histogram
-         */
-        double[] P1 = new double[data.length]; /*
-         * cumulative normalized histogram
-         */
+        int firstBin;
+        int lastBin;
+        double totalEntropy; // total entropy
+        double maximumEntropy; // max entropy
+        double backgroundEntropy; // entropy of the background pixels at a given threshold
+        double objectEntropy; // entropy of the object pixels at a given threshold
+        double[] norm_histo = new double[data.length]; // normalized histogram
+        double[] P1 = new double[data.length]; // cumulative normalized histogram
+
         double[] P2 = new double[data.length];
 
         int total = 0;
-        for (ih = 0; ih < data.length; ih++) {
+        for (int ih = 0; ih < data.length; ih++) {
             total += data[ih];
         }
 
-        for (ih = 0; ih < data.length; ih++) {
+        for (int ih = 0; ih < data.length; ih++) {
             norm_histo[ih] = (double) data[ih] / total;
         }
 
         P1[0] = norm_histo[0];
         P2[0] = 1.0 - P1[0];
-        for (ih = 1; ih < data.length; ih++) {
+        for (int ih = 1; ih < data.length; ih++) {
             P1[ih] = P1[ih - 1] + norm_histo[ih];
             P2[ih] = 1.0 - P1[ih];
         }
@@ -287,10 +283,10 @@ public class MaximumEntropyThresholdingOp extends Operator {
         /*
          * Determine the first non-zero bin
          */
-        first_bin = 0;
-        for (ih = 0; ih < data.length; ih++) {
+        firstBin = 0;
+        for (int ih = 0; ih < data.length; ih++) {
             if (!(Math.abs(P1[ih]) < 2.220446049250313E-16)) {
-                first_bin = ih;
+                firstBin = ih;
                 break;
             }
         }
@@ -298,47 +294,48 @@ public class MaximumEntropyThresholdingOp extends Operator {
         /*
          * Determine the last non-zero bin
          */
-        last_bin = data.length - 1;
-        for (ih = data.length - 1; ih >= first_bin; ih--) {
+        lastBin = data.length - 1;
+        for (int ih = data.length - 1; ih >= firstBin; ih--) {
             if (!(Math.abs(P2[ih]) < 2.220446049250313E-16)) {
-                last_bin = ih;
+                lastBin = ih;
                 break;
             }
         }
 
-        // Calculate the total entropy each gray-level
-        // and find the threshold that maximizes it 
-        max_ent = Double.MIN_VALUE;
+        /**
+         * Calculate the total entropy each gray-level and find the threshold
+         * that maximizes it
+         */
+        maximumEntropy = Double.MIN_VALUE;
 
-        for (it = first_bin; it <= last_bin; it++) {
+        for (int it = firstBin; it <= lastBin; it++) {
             /*
              * Entropy of the background pixels
              */
-            ent_back = 0.0;
-            for (ih = 0; ih <= it; ih++) {
+            backgroundEntropy = 0.0;
+            for (int ih = 0; ih <= it; ih++) {
                 if (data[ih] != 0) {
-                    ent_back -= (norm_histo[ih] / P1[it]) * Math.log(norm_histo[ih] / P1[it]);
+                    backgroundEntropy -= (norm_histo[ih] / P1[it]) * Math.log(norm_histo[ih] / P1[it]);
                 }
             }
 
             /*
              * Entropy of the object pixels
              */
-            ent_obj = 0.0;
-            for (ih = it + 1; ih < data.length; ih++) {
+            objectEntropy = 0.0;
+            for (int ih = it + 1; ih < data.length; ih++) {
                 if (data[ih] != 0) {
-                    ent_obj -= (norm_histo[ih] / P2[it]) * Math.log(norm_histo[ih] / P2[it]);
+                    objectEntropy -= (norm_histo[ih] / P2[it]) * Math.log(norm_histo[ih] / P2[it]);
                 }
             }
 
             /*
              * Total entropy
              */
-            tot_ent = ent_back + ent_obj;
+            totalEntropy = backgroundEntropy + objectEntropy;
 
-            // IJ.log(""+max_ent+"  "+tot_ent);
-            if (max_ent < tot_ent) {
-                max_ent = tot_ent;
+            if (maximumEntropy < totalEntropy) {
+                maximumEntropy = totalEntropy;
                 threshold = it;
             }
         }
