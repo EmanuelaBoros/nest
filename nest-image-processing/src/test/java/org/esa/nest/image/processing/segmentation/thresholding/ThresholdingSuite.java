@@ -4,10 +4,6 @@
  */
 package org.esa.nest.image.processing.segmentation.thresholding;
 
-import org.esa.nest.image.processing.segmentation.thresholding.BasicThresholdingOpTest;
-import org.esa.nest.image.processing.segmentation.thresholding.BasicThresholdingOpUITest;
-import org.esa.nest.image.processing.segmentation.thresholding.ThresholdingMethodEnforcementTest;
-import org.esa.nest.image.processing.segmentation.thresholding.ThresholdingTypeOperatorTest;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -20,10 +16,7 @@ import org.junit.runners.Suite;
  * @author Emanuela
  */
 @RunWith(Suite.class)
-@Suite.SuiteClasses({ThresholdingTypeOperatorTest.class,
-    ThresholdingMethodEnforcementTest.class,
-    BasicThresholdingOpTest.class,
-    BasicThresholdingOpUITest.class})
+@Suite.SuiteClasses({BasicThresholdingOpTest.class})
 public class ThresholdingSuite {
 
     @BeforeClass

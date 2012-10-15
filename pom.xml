@@ -10,7 +10,7 @@
 	           TODO: Move the sourceEncoding property to the build tag if version 3.0 is released
 	           -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<skipTests>true</skipTests>
+		<!--<skipTests>true</skipTests> -->
 		
 		<beam.version>4C-4.10</beam.version>
         <ceres.version>4C-0.13</ceres.version>
@@ -578,7 +578,7 @@
                 <version>1.0.2</version>
             </dependency>
 
-            <!-- JUnit Libraries ############################################# -->
+            <!-- JUnit Libraries ###############jtransforms############################## -->
 
             <dependency>
                 <groupId>junit</groupId>
