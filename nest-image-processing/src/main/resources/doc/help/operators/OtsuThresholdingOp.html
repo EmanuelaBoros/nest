@@ -1,0 +1,38 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+        <title>Help - Otsu Thresholding Method</title><link rel="stylesheet" href="../style.css"></head>
+    <body>
+        <table class="header">
+            <tbody>
+                <tr class="header">
+                    <td class="header">&nbsp; Otsu Thresholding Method</td>
+                    <td class="header" align="right"><a href="../general/Overview.html"><img src="../images/HeaderLogo.jpg" border="0"></a></td>
+                </tr>
+            </tbody>
+        </table>
+        <h3>Otsu Thresholding Method</h3>
+
+        <p>This plugin implements the Otsu thresholding method for image processing 
+            and it was ported from 
+            the open source library <a href="http://rsb.info.nih.gov/ij/index.html">ImageJ</a>.</p>
+
+        The histogram is divided in two classes and the inter-class variance is minimized. This plugin outputs a thresholded image with the selected threshold
+        applied on the entire image. The between class variance is computed and 
+        the threshold with the maximum between class variance also has the 
+        minimum within class variance,used for finding 
+        the best threshold in a simpler and better approach.
+
+        <b>Parameters Used</b><br>
+        For most filters, the following parameter should be selected:
+        <ol>
+            <li><b>Source Band:</b> All bands (real or virtual) of the source product. 
+                User can select one or more bands 
+                for producing thresholded images. If no bands are selected, then by default all bands will be selected. 
+                For complex product, only the intensity band can be selected.</li>
+        </ol>
+        <br>
+
+        <br><img width="510" height="250" alt="" src="images/Otsu.png"><br>
+        <p>Figure 1. Otsu Thresholding</p><br>
+        <hr>
+    </body></html>

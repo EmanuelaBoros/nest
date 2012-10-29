@@ -1,0 +1,70 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>Help - Morphology Operators</title>
+
+        <link rel="stylesheet" href="../style.css"></head>
+    <body>
+        <table class="header">
+            <tbody>
+                <tr class="header">
+                    <td class="header">&nbsp; Morphology Operators</td>
+                    <td class="header" align="right"><a href="../general/Overview.html">
+                            <img src="../images/HeaderLogo.jpg" border="0" alt=""></a></td>
+                </tr>
+            </tbody>
+        </table>
+        <h3>Morphology Operators</h3>
+
+        <p>This plugin implements the basic morphological operators for image processing, 
+            dilation, erosion, opening, closing and it was ported from 
+            the open source library <a href="http://rsb.info.nih.gov/ij/index.html">ImageJ</a>.</p>
+
+        <b>Parameters Used</b><br>
+        For most filters, the following parameters should be selected (see Figure 1 for example):
+        <ol>
+            <li><b>Source Band:</b> All bands (real or virtual) of the source product. User can select one or more bands 
+                for producing filtered images. If no bands are selected, then by default all bands will be selected. 
+                For complex product, only the intensity band can be selected.</li>
+            <li><b>Morphology Operator:</b> Dilate, Erode, Open, Close</li>
+            <li><b>Iterations:</b> How many times the operator will be applied</li>
+        </ol>
+        <br><img width="399" height="400" alt="" src="images/MorphologyMenu.png"><br>
+        Figure 1. Dialog box for Morphology Operators
+
+        <br>
+        <p><b>Dilate:</b> The basic effect of the operator on a binary image is to gradually enlarge 
+            the boundaries of regions of foreground pixels (i.e. white pixels, typically). Thus areas 
+            of foreground pixels grow in size while holes within those regions become smaller.</p>
+        <br><img width="510" height="250" alt="" src="images/Dilate.png"><br>
+        Figure 1. Dilate Operator
+
+        <p><b>Erode:</b> The basic effect of the operator on a binary image is to erode away the boundaries 
+            of regions of foreground pixels (i.e. white pixels, typically). Thus areas of foreground pixels 
+            shrink in size, and holes within those areas become larger.  </p>
+        <br><img width="510" height="250" alt="" src="images/Erode.png"><br>
+        Figure 1. Erode Operator
+
+        <p><b>Open:</b> The basic effect of an opening is somewhat like erosion in that it tends to remove 
+            some of the foreground (bright) pixels from the edges of regions of foreground pixels. However 
+            it is less destructive than erosion in general. As with other morphological operators, the exact 
+            operation is determined by a structuring element. The effect of the operator is to preserve 
+            foreground regions that have a similar shape to this structuring element, or that can completely 
+            contain the structuring element, while eliminating all other regions of foreground pixels.</p>
+        <br><img width="510" height="250" alt="" src="images/Open.png"><br>
+        Figure 1. Open Operator
+
+        <p><b>Close:</b> Closing is similar in some ways to dilation in that it tends to enlarge the boundaries 
+            of foreground (bright) regions in an image (and shrink background color holes in such regions), 
+            but it is less destructive of the original boundary shape. As with other morphological operators, 
+            the exact operation is determined by a structuring element. The effect of the operator is to 
+            preserve background regions that have a similar shape to this structuring element, or that can 
+            completely contain the structuring element, while eliminating all other regions of background pixels.</p>
+        <br><img width="510" height="250" alt="" src="images/Close.png">
+        Figure 1. Close Operator
+        <br>
+        <b>Reference:</b><br>
+        <p> [1] <a href="http://rsb.info.nih.gov/ij/plugins/gray-morphology.html">Grayscale Morphology ImageJ Plugin</a></p>
+        <p> [2] Heijmans, H.J.A.M., <i>Theoretical aspects of gray-level morphology</i>, IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI),
+        Vol. 13, Issue 6, pp. 568 - 582, Jun 1991.</p>
+        <hr>
+    </body>
+</html>

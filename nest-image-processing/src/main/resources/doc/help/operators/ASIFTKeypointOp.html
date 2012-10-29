@@ -1,0 +1,33 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>Help - ASIFT Keypoint Detector</title>
+
+        <link rel="stylesheet" href="../style.css"></head>
+    <body>
+        <table class="header">
+            <tbody>
+                <tr class="header">
+                    <td class="header">&nbsp; ASIFT Keypoint Detector</td>
+                    <td class="header" align="right"><a href="../general/Overview.html"><img src="../images/HeaderLogo.jpg" border="0"></a></td>
+                </tr>
+            </tbody>
+        </table>
+        <h3>ASIFT (Affine-SIFT) Keypoint Detector</h3>
+        While SIFT is fully invariant with respect to only four parameters namely zoom, rotation 
+        and translation, the new method treats the two left over parameters: the angles defining 
+        the camera axis orientation. The method permits to reliably identify features that have 
+        undergone very large affine distortions measured by a new parameter, the transition tilt.<br>
+
+        The Affine-SIFT (ASIFT) simulates a set of sample views of the initial images, 
+        obtainable by varying the two camera axis orientation parameters, namely the latitude 
+        and the longitude angles, which are not treated by the SIFT method. Then it applies the 
+        SIFT method itself to all images thus generated.<br><br>
+
+        The ASIFT detector performs keypoint detection. 
+        <br><img width="510" height="250" alt="" src="images/ASIFT.png"><br>
+        Figure 1. ASIFT detected keypoints <br><br>
+
+        <p> [1] J.M. Morel and G.Yu, ASIFT, A new framework for fully affine invariant image comparison.</p>
+        SIAM Journal on Imaging Sciences, 2(2):438-469 (2009). DOI:10.1137/080732730 preprint
+        <p> [2] <a href="http://www.cmap.polytechnique.fr/~yu/research/ASIFT/demo.html">SIFT and ASIFT - online demo</a></p>
+        <hr>
+    </body></html>
