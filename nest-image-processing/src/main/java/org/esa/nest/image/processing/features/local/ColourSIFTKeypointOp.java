@@ -50,7 +50,7 @@ import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 @OperatorMetadata(alias = "ASIFTKeypoint",
 category = "SAR Tools\\Image Processing",
 description = "ASIFTKeypoint")
-public class ASIFTKeypointOp extends Operator {
+public class ColourSIFTKeypointOp extends Operator {
 
     public static float[] probabilityHistogram;
     final static int MAX_VALUE = 256;
@@ -281,8 +281,8 @@ public class ASIFTKeypointOp extends Operator {
      */
     public static class Spi extends OperatorSpi {
 
-        public Spi() {
-            super(ASIFTKeypointOp.class);
+        public Spi()   {
+            super(ColourSIFTKeypointOp.class);
             setOperatorUI(ASIFTKeypointOpUI.class);
         }
     }

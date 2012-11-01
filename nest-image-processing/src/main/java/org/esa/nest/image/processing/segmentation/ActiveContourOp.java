@@ -36,6 +36,8 @@ import java.awt.image.RenderedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
@@ -74,10 +76,6 @@ public class ActiveContourOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
-    private float highThreshold = 100f;
-    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
-    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
@@ -87,6 +85,7 @@ public class ActiveContourOp extends Operator {
     private int filterSizeX = 3;
     private int filterSizeY = 3;
     private static ImagePlus fullImagePlus;
+    private static ByteProcessor fullByteProcessor;
     ActiveContourConfigurationDriver configDriver;
     @Parameter(description = "Number of Iterations", defaultValue = "100", label = "nIterations")
     int nIterations = 50;
@@ -106,6 +105,11 @@ public class ActiveContourOp extends Operator {
     @Parameter(description = "Regularization Factor", defaultValue = "5.0", label = "RegularizationFactor")
     double dRegularization = 5.0;
     double dMinRegularization, dMaxRegularization;
+    /**
+     *
+     */
+    private static ArrayList<Roi> currentROIs = new ArrayList<Roi>();
+    private final Lock lock = new ReentrantLock();
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -203,6 +207,7 @@ public class ActiveContourOp extends Operator {
             pm.done();
         }
     }
+
     /**
      * Apply Otsu Thresholding
      *
@@ -220,9 +225,6 @@ public class ActiveContourOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private static ArrayList<Roi> currentROIs = new ArrayList<Roi>();
-    private final Object lock = new Object();
-
     private synchronized void initializeActiveContoursProcessing(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
             final ProgressMonitor pm) {
@@ -236,10 +238,9 @@ public class ActiveContourOp extends Operator {
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
             ImageProcessor imageProcessor = fullImagePlus.getProcessor().convertToByte(true);
-            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
-            contrastEnhancer.equalize(imageProcessor);
 
             fullImagePlus.setProcessor(imageProcessor);
+            fullByteProcessor = (ByteProcessor) imageProcessor;//.convertToByte(true);
 
             ProductNodeGroup<VectorDataNode> productNodeGroup = sourceProduct.getVectorDataGroup();
             for (int i = 0; i < productNodeGroup.getNodeCount(); i++) {
@@ -265,6 +266,7 @@ public class ActiveContourOp extends Operator {
                     currentROIs.add(new Roi(currentROI.getBounds()));
                 }
             }
+
             RoiManager managerROI = RoiManager.getInstance();
 
             if (currentROIs.size() > 0 && managerROI == null) {
@@ -276,13 +278,14 @@ public class ActiveContourOp extends Operator {
                 for (int i = 0; i < currentROIs.size(); i++) {
 
                     Roi currentROI = currentROIs.get(i);
-                    fullImageProcessor.setRoi(new Roi(currentROI.getBounds()));
+                    fullImageProcessor.setRoi(currentROI);
 
                     ImageProcessor roiImageProcessor = fullImageProcessor.crop();
 
                     ImagePlus currentImagePlus = new ImagePlus(sourceBand.getName() + "#" + i,
                             roiImageProcessor);
                     currentImagePlus.setProcessor(roiImageProcessor);
+
                     if (roiImageProcessor.getRoi() == null) {
                         IJ.showMessage("Roi required");
                     } else {
@@ -294,37 +297,49 @@ public class ActiveContourOp extends Operator {
 
                         ImagePlus currentImagePlus;
                         RoiManager managerROI;
-                        public boolean hasROIs = false;
+                        public boolean isLocked = true;
 
                         public ActiveContourThread(ImagePlus currentImagePlus,
                                 RoiManager managerROI) {
                             this.currentImagePlus = currentImagePlus;
                             this.managerROI = managerROI;
+
+                            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+                            contrastEnhancer.equalize(currentImagePlus.getProcessor());
                             currentImagePlus.show();
                         }
 
                         @Override
                         public void run() {
+                            lock.lock();
                             synchronized (lock) {
-                                while (!hasROIs) {
+                                while (isLocked) {
                                     int nbRois = managerROI.getCount();
-
                                     if (nbRois > 1) {
-                                        JOptionPane.showMessageDialog(null, "saving.. " + nbRois,
-                                                "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
+                                        JOptionPane.showMessageDialog(null,
+                                                "The active contour starts.. " + nbRois,
+                                                "Information", JOptionPane.INFORMATION_MESSAGE);
                                         final Roi[] originalROIs = managerROI.getRoisAsArray();
                                         for (int i = 1; i < nbRois; i++) {
-                                            ActiveContour currentActivecontour = processActiveContour(
+                                            ActiveContour currentActiveContour = processActiveContour(
                                                     currentImagePlus,
-                                                    originalROIs[i], currentImagePlus.getProcessor(), i,
+                                                    originalROIs[i],
+                                                    currentImagePlus.getProcessor(), i,
                                                     x0 + "," + y0);
-                                            //                    roiImageProcessor = currentActivecontour.drawContour(roiImageProcessor, Color.white, 2);
-                                            //                    Roi resultROI = currentActivecontour.createROI();
-                                            //                    currentImagePlus.setRoi(resultROI);
-                                            //                    currentImagePlus.setProcessor(roiImageProcessor);
-                                            //                    currentImagePlus.show();
-                                            hasROIs = true;
+//                                            currentImagePlus.setProcessor(
+//                                                    currentActiveContour.drawContour(
+//                                                    currentImagePlus.getProcessor(),
+//                                                    Color.WHITE, 3));
+//                                            currentImagePlus.setProcessor(
+//                                                    (ByteProcessor) processActiveContourByProcessor(currentImagePlus,
+//                                                    originalROIs[i],
+//                                                    currentImagePlus.getProcessor(), i,
+//                                                    x0 + "," + y0).convertToByte(true));
                                         }
+                                        isLocked = false;
+                                        lock.unlock();
+                                        lock.notify();
+
                                     }
                                 }
                             }
@@ -332,6 +347,7 @@ public class ActiveContourOp extends Operator {
 
                         @Override
                         protected void finalize() throws Throwable {
+                            super.finalize();
                             currentImagePlus.close();
                         }
                     }
@@ -340,7 +356,7 @@ public class ActiveContourOp extends Operator {
                             managerROI);
                     thread.start();
                     synchronized (lock) {
-                        while (!thread.hasROIs) {
+                        while (thread.isLocked) {
                             try {
                                 lock.wait();
                             } catch (InterruptedException ex) {
@@ -348,27 +364,29 @@ public class ActiveContourOp extends Operator {
                             }
                         }
                     }
-
+                    managerROI.close();
                 }
-                processed = true;
+
             }
+            processed = true;
         }
-//        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
-//
-//        Roi currentROI = new Roi(sourceRaster.getRectangle());
-//        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
-//        aPartProcessor.setRoi(srcTileRectangle);
-//        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
+
+        ImageProcessor aPartProcessor = fullImagePlus.getProcessor().duplicate();
+
+        aPartProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+
         final ProductData trgData = targetTile.getDataBuffer();
-//        final ProductData sourceData = ProductData.createInstance((byte[]) fullImagePlus.getPixels());
+        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+
         final int maxY = y0 + h;
         final int maxX = x0 + w;
-        for (int y = y0;
-                y < maxY;
-                ++y) {
+        for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-//                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),
-//                        sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y)));
+                float fValue = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), fValue);
             }
         }
     }
@@ -389,8 +407,6 @@ public class ActiveContourOp extends Operator {
     public ActiveContour processActiveContour(ImagePlus imagePlus, Roi currentROI,
             ImageProcessor roiImageProcessor, int numSlice, String numRoi) {
 
-//        imagePlus.show();
-
         ActiveContour activeContour = new ActiveContour();
         activeContour.initActiveContour(currentROI);
         activeContour.setOriginalImage(imagePlus.getProcessor());
@@ -402,7 +418,7 @@ public class ActiveContourOp extends Operator {
         double invAlphaD = configDriver.getInvAlphaD(false);
         double regMax = configDriver.getReg(false);
         double regMin = configDriver.getReg(true);
-        double maxDisplacement = configDriver.getMaxDisplacement(false);
+        maxDisplacement = configDriver.getMaxDisplacement(false);
         double mul = configDriver.getStep();
 
         ActiveContourConfiguration config = new ActiveContourConfiguration(
@@ -429,15 +445,69 @@ public class ActiveContourOp extends Operator {
 
             if ((step > 0) && ((i % step) == 0)) {
                 IJ.showStatus("Show intermediate result (iteration n" + (i + 1) + ")");
-                ByteProcessor image2 = (ByteProcessor) roiImageProcessor.duplicate();
-                activeContour.drawContour(image2, Color.WHITE, 3);
-                imagePlus.setProcessor(image2);
+                ByteProcessor tempProcessor = (ByteProcessor) roiImageProcessor.duplicate();
+                activeContour.drawContour(tempProcessor, Color.WHITE, 3);
+                imagePlus.setProcessor(tempProcessor);
                 imagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
                         + " (iteration n" + (i + 1) + ")");
                 imagePlus.updateAndRepaintWindow();
             }
         }
+        activeContour.drawContour(roiImageProcessor, Color.WHITE, 3);
         return activeContour;
+    }
+
+    public ImageProcessor processActiveContourByProcessor(ImagePlus imagePlus, Roi currentROI,
+            ImageProcessor roiImageProcessor, int numSlice, String numRoi) {
+
+        ActiveContour activeContour = new ActiveContour();
+        activeContour.initActiveContour(currentROI);
+        activeContour.setOriginalImage(imagePlus.getProcessor());
+
+        if (step > 0) {
+            imagePlus.show();
+        }
+
+        double invAlphaD = configDriver.getInvAlphaD(false);
+        double regMax = configDriver.getReg(false);
+        double regMin = configDriver.getReg(true);
+        maxDisplacement = configDriver.getMaxDisplacement(false);
+        double mul = configDriver.getStep();
+
+        ActiveContourConfiguration config = new ActiveContourConfiguration(
+                gradientThreshold, maxDisplacement,
+                maxDistance, regMin, regMax, 1.0 / invAlphaD);
+        activeContour.setConfiguration(config);
+
+        activeContour.computeGradient(roiImageProcessor);
+
+        IJ.resetEscape();
+
+        double dist0 = 0.0;
+        double dist;
+        for (int i = 0; i < nIterations; i++) {
+            if (IJ.escapePressed()) {
+                break;
+            }
+            dist = activeContour.process();
+            if ((dist >= dist0) && (dist < this.maxDisplacement)) {
+                activeContour.computeGradient(roiImageProcessor);
+                config.update(mul);
+            }
+            dist0 = dist;
+
+            if ((step > 0) && ((i % step) == 0)) {
+//                IJ.showStatus("Show intermediate result (iteration n" + (i + 1) + ")");
+//                ByteProcessor tempProcessor = (ByteProcessor) roiImageProcessor.duplicate();
+//                activeContour.drawContour(tempProcessor, Color.WHITE, 3);
+//                imagePlus.setProcessor(tempProcessor);
+//                imagePlus.setTitle(fullImagePlus.getTitle() + " roi " + numRoi
+//                        + " (iteration n" + (i + 1) + ")");
+//                imagePlus.updateAndRepaintWindow();
+            }
+        }
+        activeContour.drawContour(roiImageProcessor, Color.WHITE, 3);
+        return roiImageProcessor;
     }
 
     /**

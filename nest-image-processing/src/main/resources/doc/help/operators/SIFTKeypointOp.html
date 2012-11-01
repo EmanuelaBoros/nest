@@ -18,27 +18,48 @@
             features from SAR images and it was ported from 
             the open source library <a href="http://www.openimaj.org/">OpenImaJ</a>.</p>
         <br>
-        <b>Scale Invariant Feature Transform (SIFT)</b> is an image descriptor for image-based matching 
-        developed by David Lowe ([1], [2]). This descriptor as well as related image descriptors 
-        are used for a large number of purposes in computer vision related to point matching between 
-        different views of a 3-D scene and view-based object recognition. The SIFT descriptor is invariant 
-        to translations, rotations and scaling transformations in the image domain and robust to moderate 
-        perspective transformations and illumination variations. Experimentally, the SIFT descriptor has 
-        been proven to be very useful in practice for image matching and object recognition under real-world 
-        conditions. 
-        <b>Parameters Used</b><br>
-        For most filters, the following parameters should be selected (see Figure 1 for example):
+        <p><b>Scale Invariant Feature Transform (SIFT)</b> is an image descriptor for image-based matching 
+            developed by David Lowe ([1], [2]). This descriptor as well as related image descriptors 
+            are used for a large number of purposes in computer vision related to point matching between 
+            different views of a 3-D scene and view-based object recognition. The SIFT descriptor is invariant 
+            to translations, rotations and scaling transformations in the image domain and robust to moderate 
+            perspective transformations and illumination variations. Experimentally, the SIFT descriptor has 
+            been proven to be very useful in practice for image matching and object recognition under real-world 
+            conditions.</p><br>
+        <p>The algorithm basically extracts features that are invariant to rotation, scaling an partially invariant to changes in illumination an affine transformations. The features generated should be highly distinctive. To aid the extraction of these features the SIFT algorithm applies a four stage filtering approach:</p>
+        <ol>
+            <li><b>Scale-Space Extrema Detection.</b> Interest points for SIFT features correspond to local extrema of Difference-of-Gaussian filters at different scales. The first step towards the detection of interest points is the convolution of the image with Gaussian filters at different scales which means generating progressively blurred out images, and the generation of Difference-of-Gaussian (DoG) images from the difference of adjacent blurred images.</li>
+            <li><b>Keypoint Localization.</b> In order to detect the local maxima and minima of Difference-of-Gaussian (DoG) images, each sample point is compared to its eight neighbors in the current image and nine neighbors in the scale above and below.</li>
+            <li><b>Orientation Assignment.</b> For each candidate keypoint:
+                <ol>
+                    <li>Interpolation of nearby data is used to accurately determine its position</li>
+                    <li>Keypoints with low contrast are removed</li>
+                    <li>Responses along edges are eliminated</li>
+                    <li>The keypoint is assigned an orientation</li>
+                </ol>
+            <li><b>Keypoint Descriptor.</b> Once a keypoint orientation has been selected, the feature descriptor is computed as a set of orientation histograms on 4 x 4 pixel neighborhoods. The orientation histograms are relative to the keypoint orientation, the orientation data comes from the Gaussian image closest in scale to the keypoint's scale. </li>
+        </ol><br>
+        <p><b>Parameters Used</b></p><br>
+        <p>For most operators, the following parameters should be selected:</p>
         <ol>
             <li><b>Source Band:</b> All bands (real or virtual) of the source product. User can select one or more bands 
                 for producing filtered images. If no bands are selected, then by default all bands will be selected. 
                 For complex product, only the intensity band can be selected.</li>
         </ol>
-        <br><img width="510" height="250" alt="" src="images/SIFT.png"><br>
+        <br>
+        <p><b>SIFT features extraction example:</b></p><br>
+        <img width="510" height="250" alt="" src="images/SIFT.png"><br>
         <p>Figure 1. SIFT detected keypoints</p><br>
+        <p><b>SIFT features matching:</b></p><br>
+        <img width="504" height="252" alt="" src="images/SIFT-match.png"><br>
+        <p>The SIFT keypoint matcher matches keypoints by finding closest two keypoints to target and checking whether the distance
+        between the two matches is sufficiently large.</p>
         <hr>
-        <p> [1] Lowe, David G. (1999). "Object recognition from local scale-invariant features". Proceedings 
-        of the International Conference on Computer Vision. 2. pp. 1150–1157. doi:10.1109/ICCV.1999.790410.</p>
-        <p> [2] David G. Lowe, Distinctive image features from scale-invariant keypoints,
-        International Journal of Computer Vision, 60, 2 (2004), pp. 91-110. [PDF]</p>
+        <p><i>References:</i></p>
+        <p>[1] D. G. Lowe. Object recognition from local scale-invariant features. <i>Proceedings of the 7th International Conference on Computer Vision</i>, pages 1150-1157, 1999.</p>
+        <p>[2] D. G. Lowe. Distinctive image features from scale-invariant keypoints. <i>International Journal of Computer Vision</i>, 2(60):91-110, 2004.</p>
+        <p>[3] M. Brown and D.G Lowe. Invariant features from interest point groups. <i>The 13th British Machine Vision Conference</i>, Cardiff University, UK, pages 253-262, 2002.</p>
+        <p>[4] H. You and K. Fu.  BFSIFT: A Novel Method to Find Feature Matches for SAR Image Registration. <i>Geoscience and Remote Sensing Letters, IEEE</i>, Volume: 9 , Issue: 4, pages 649-653, July 2012.</p>
+        <p>[5] S. Ren, W. Chang and X. Liu. SAR image matching method based on improved sift for navigation system. <i>Progress In Electromagnetics Research M</i>,Vol. 18, 259-269, 2011. </p>
     </body>
 </html>

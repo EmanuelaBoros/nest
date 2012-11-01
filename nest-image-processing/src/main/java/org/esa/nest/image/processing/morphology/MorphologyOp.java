@@ -84,7 +84,7 @@ public class MorphologyOp extends Operator {
      *
      * @param s The filter name.
      */
-    public void SetOperator(String s) {
+    public void setOperator(String s) {
 
         if (s.equals(DILATE_OPERATOR)
                 || s.equals(ERODE_OPERATOR)

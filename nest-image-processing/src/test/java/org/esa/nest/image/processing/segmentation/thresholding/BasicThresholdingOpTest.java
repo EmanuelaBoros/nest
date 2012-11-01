@@ -16,8 +16,11 @@
 package org.esa.nest.image.processing.segmentation.thresholding;
 
 import com.bc.ceres.core.ProgressMonitor;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.esa.beam.dataio.envisat.EnvisatProductReader;
 import org.esa.beam.dataio.envisat.EnvisatProductReaderPlugIn;
 import org.esa.beam.framework.datamodel.Band;
@@ -42,25 +45,24 @@ public class BasicThresholdingOpTest {
     private final static String inputSARpath = "SAR/"
             + "ASA_WSM_1PNUPA20080124_101559_000000672065_00237_30852_1983.N1";
     EnvisatProductReaderPlugIn readerPlugIn = new EnvisatProductReaderPlugIn();
-
-    public BasicThresholdingOpTest() {
-        spi = new BasicThresholdingOp.Spi();
-    }
-
-    @BeforeClass
-    public static void setUpClass() {
-    }
-
-    @AfterClass
-    public static void tearDownClass() {
-    }
+    EnvisatProductReader reader;
+    Product sourceProduct;
+    BasicThresholdingOp op;
+    
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        URL url = getClass().getClassLoader().getResource(inputSARpath);
+        spi = new BasicThresholdingOp.Spi();
+        reader = (EnvisatProductReader) readerPlugIn.createReaderInstance();
+        sourceProduct = reader.readProductNodes(url.getFile(), null);
+        op = (BasicThresholdingOp) spi.createOperator();
     }
 
     @After
     public void tearDown() {
+        spi = null;
+        readerPlugIn = null;
     }
 
     /**
@@ -69,14 +71,11 @@ public class BasicThresholdingOpTest {
      * @throws Exception The exception.
      */
     @Test
-    public void testHysteresisThresholdingOperator() throws Exception {
+    public void testHysteresisThresholdingOperator() {
 
-        final EnvisatProductReader reader = (EnvisatProductReader) readerPlugIn.createReaderInstance();
-        URL url = getClass().getClassLoader().getResource(inputSARpath);
-        final Product sourceProduct = reader.readProductNodes(url.getFile(), null);
         assertNotNull(sourceProduct);
-        final BasicThresholdingOp op = (BasicThresholdingOp) spi.createOperator();
         assertNotNull(op);
+
         op.setSourceProduct(sourceProduct);
         op.setOperator(BasicThresholdingOp.Method.Hysteresis);
 
@@ -85,10 +84,13 @@ public class BasicThresholdingOpTest {
         assertNotNull(band);
 
         final float[] floatValues = new float[8];
-        band.readPixels(58, 184, 4, 2, floatValues, ProgressMonitor.NULL);
-
-        final float[] expected = {0f, -1f, -1f, -1f, 0f, -1f, -1f, -1f};
-        assertTrue(Arrays.equals(expected, floatValues));
+        try {
+            band.readPixels(58, 184, 4, 2, floatValues, ProgressMonitor.NULL);
+            final float[] expected = {0f, -1f, -1f, -1f, 0f, -1f, -1f, -1f};
+            assertTrue(Arrays.equals(expected, floatValues));
+        } catch (IOException ex) {
+            Logger.getLogger(BasicThresholdingOpTest.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -99,12 +101,9 @@ public class BasicThresholdingOpTest {
     @Test
     public void testMixtureModelingThresholdingOperator() throws Exception {
 
-        final EnvisatProductReader reader = (EnvisatProductReader) readerPlugIn.createReaderInstance();
-        URL url = getClass().getClassLoader().getResource(inputSARpath);
-        final Product sourceProduct = reader.readProductNodes(url.getFile(), null);
         assertNotNull(sourceProduct);
-        final BasicThresholdingOp op = (BasicThresholdingOp) spi.createOperator();
         assertNotNull(op);
+
         op.setSourceProduct(sourceProduct);
         op.setOperator(BasicThresholdingOp.Method.MixtureModeling);
 
@@ -127,12 +126,9 @@ public class BasicThresholdingOpTest {
     @Test
     public void testMaximumEntropyThresholdingOperator() throws Exception {
 
-        final EnvisatProductReader reader = (EnvisatProductReader) readerPlugIn.createReaderInstance();
-        URL url = getClass().getClassLoader().getResource(inputSARpath);
-        final Product sourceProduct = reader.readProductNodes(url.getFile(), null);
         assertNotNull(sourceProduct);
-        final BasicThresholdingOp op = (BasicThresholdingOp) spi.createOperator();
         assertNotNull(op);
+
         op.setSourceProduct(sourceProduct);
         op.setOperator(BasicThresholdingOp.Method.MaximumEntropy);
 
@@ -142,8 +138,37 @@ public class BasicThresholdingOpTest {
 
         final float[] floatValues = new float[8];
         band.readPixels(345, 300, 4, 2, floatValues, ProgressMonitor.NULL);
+        for (float f : floatValues) {
+            System.out.print(f + ",");
+        }
+        final float[] expected = {-1f, -1f, -1f, -1f, -1f, -1f, -1f, -1f};
+        assertTrue(Arrays.equals(expected, floatValues));
+    }
 
-        final float[] expected = {-1f, 0f, -1f, -1f, -1f, -1f, -1f, -1f};
+    /**
+     * Tests Otsu with a 4-by-4 test product.
+     *
+     * @throws Exception The exception.
+     */
+    @Test
+    public void testOtsuThresholdingOperator() throws Exception {
+
+        assertNotNull(sourceProduct);
+        assertNotNull(op);
+
+        op.setSourceProduct(sourceProduct);
+        op.setOperator(BasicThresholdingOp.Method.Otsu);
+
+        final Product targetProduct = op.getTargetProduct();
+        final Band band = targetProduct.getBandAt(0);
+        assertNotNull(band);
+
+        final float[] floatValues = new float[8];
+        band.readPixels(57, 246, 4, 2, floatValues, ProgressMonitor.NULL);
+        for (float f : floatValues) {
+            System.out.print(f + ",");
+        }
+        final float[] expected = {0f, 0f, -1f, -1f, 0f, 0f, -1f, -1f};
         assertTrue(Arrays.equals(expected, floatValues));
     }
 }

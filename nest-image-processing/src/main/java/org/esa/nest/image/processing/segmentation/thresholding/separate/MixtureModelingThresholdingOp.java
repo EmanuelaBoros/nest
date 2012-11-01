@@ -67,8 +67,8 @@ public class MixtureModelingThresholdingOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -185,50 +185,51 @@ public class MixtureModelingThresholdingOp extends Operator {
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
             processed = true;
-        }
 
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
-        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
-        int width = fullByteProcessor.getWidth();
-        int height = fullByteProcessor.getHeight();
+            int width = fullByteProcessor.getWidth();
+            int height = fullByteProcessor.getHeight();
 
-        N = width * height;
+            N = width * height;
 
-        GrayLevelClassMixtureModeling classes = new GrayLevelClassMixtureModeling(fullByteProcessor);
+            GrayLevelClassMixtureModeling classes = new GrayLevelClassMixtureModeling(fullByteProcessor);
 
-        int foundThreshold = 0;
+            int foundThreshold = 0;
 
-        float error = 0;
-        float errorMin = Float.MAX_VALUE;
-        float mu1 = 0, mu2 = 0;
+            float error = 0;
+            float errorMin = Float.MAX_VALUE;
+            float mu1 = 0, mu2 = 0;
 
-        while (classes.addToIndex()) {
-            error = calculateError(classes);
-            if (error < errorMin) {
-                errorMin = error;
-                foundThreshold = classes.getThreshold();
-                mu1 = classes.getMu1();
-                mu2 = classes.getMu2();
+            while (classes.addToIndex()) {
+                error = calculateError(classes);
+                if (error < errorMin) {
+                    errorMin = error;
+                    foundThreshold = classes.getThreshold();
+                    mu1 = classes.getMu1();
+                    mu2 = classes.getMu2();
+                }
             }
+            classes.setIndex(foundThreshold);
+
+            threshold = findThreshold((int) mu1, (int) mu2, classes);
         }
-        classes.setIndex(foundThreshold);
-
-        threshold = findThreshold((int) mu1, (int) mu2, classes);
-
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        fullByteProcessor.setRoi(srcTileRectangle);
+        ImageProcessor aPartProcessor = fullImagePlus.getProcessor().duplicate();
 
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
-        ImagePlus imp = null;
-        imp = NewImage.createByteImage("Threshold", roiImageProcessor.getWidth(),
+        aPartProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor roiImageProcessor = aPartProcessor.crop();
+
+        ImagePlus imp = NewImage.createByteImage("Threshold", roiImageProcessor.getWidth(),
                 roiImageProcessor.getHeight(), 1, NewImage.FILL_WHITE);
 
         ImageProcessor nip = imp.getProcessor();
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
+        for (int x = 0; x < roiImageProcessor.getWidth(); x++) {
+            for (int y = 0; y < roiImageProcessor.getHeight(); y++) {
                 int value = roiImageProcessor.getPixel(x, y);
                 if (value > threshold) {
                     nip.putPixel(x, y, 255);

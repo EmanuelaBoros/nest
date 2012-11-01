@@ -39,6 +39,6 @@ public interface TemplateMatcherEnforcement {
      * @return the matching score between the image and the template
      */
     public float computeMatchScore(
-            final Band sourceBand, final Tile templateTile,
-            final int x, final int y, SARTemplateMatcher.Mode mode);
+            Band sourceBand, final Tile sourceRaster, Band targetBand, final Tile targetTile,
+            SARTemplateMatcher.Mode mode);
 }

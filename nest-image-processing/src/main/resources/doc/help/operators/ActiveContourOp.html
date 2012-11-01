@@ -10,8 +10,37 @@
                 </tr>
             </tbody>
         </table>
-        <h3>Active Contour</h3><p>
+        <h3>Active Contour</h3>
 
+        <img width="510" height="250" alt="" src="images/activecontourmenu.png"><br>
+        <p>Figure 1. Active Contour Parameters</p><br>
+        <br>
+        <p><b>Parameters Used</b></p><br>
+        <p>The following parameters should be selected (see Figure 1 for example):</p>
+        <ol>
+            <li><b>Source Band:</b> All bands (real or virtual) of the source product. User can select one or more bands 
+                for producing filtered images. If no bands are selected, then by default all bands will be selected. 
+                For complex product, only the intensity band can be selected.</li>
+            <li><b>Iterations:</b> the number of iterations</li>
+            <li><b>Step:</b> The step to display intermediate results</li>
+            <li><b>Gradient Threshold:</b> Threshold to find edges</li>
+            <li><b>Maximum Displacement:</b> Maximum displacements of points at each iteration</li>
+            <li><b>Maximum Distance:</b> Maximum distance to find and edges (used for growing or shrinking snakes)</li>
+            <li><b>Regularization Factor:</b> regularization value</li>
+        </ol>
+        <br>
+        <p>First of all, select the region where the active contour will be initialized.</p>
+        <img width="510" height="250" alt="" src="images/rois3.png"><br>
+        <p>Figure 2. Selected Rectangle</p><br>
+        <p>Next, the image is shown with a <i>ROIManager</i> from <a href="http://rsb.info.nih.gov/ij/index.html">ImageJ</a>. Select a ROI by creating a rectangle on the image and the press Add from the ROIManager.</p>
+        <img width="510" height="250" alt="" src="images/rois4.png"><br>
+        <p>Figure 3. Selected Rectangle</p><br>
+        <p>The active contour is then initialized and all the steps are shown.</p>
+        <img width="510" height="250" alt="" src="images/rois5.png"><br>
+        <p>Figure 4. Selected Rectangle</p><br>
         <hr>
+        <b>Reference:</b><br>
+        <p> [1] <a href="http://imagejdocu.tudor.lu/doku.php?id=plugin:segmentation:active_contour:start">Active Contour (Snake) ImageJ Plugin</a></p>
+
     </body>
 </html>

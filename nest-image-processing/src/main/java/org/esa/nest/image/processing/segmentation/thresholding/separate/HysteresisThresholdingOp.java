@@ -37,6 +37,7 @@ import org.esa.beam.framework.gpf.annotations.Parameter;
 import org.esa.beam.framework.gpf.annotations.SourceProduct;
 import org.esa.beam.framework.gpf.annotations.TargetProduct;
 import org.esa.nest.gpf.OperatorUtils;
+import org.esa.nest.image.processing.segmentation.thresholding.ThresholdingTypeOperator;
 
 /**
  * This plug-in takes as parameters a grayscale image and two thresholds (low
@@ -72,8 +73,8 @@ public class HysteresisThresholdingOp extends Operator {
     private int halfSizeY;
     private int filterSizeX = 3;
     private int filterSizeY = 3;
-    private static ImagePlus fullImagePlus;
     private static ByteProcessor fullByteProcessor;
+    protected Map<String, Object> paramMap = null;
 
     /**
      * Initializes this operator and sets the one and only target product.
@@ -91,6 +92,8 @@ public class HysteresisThresholdingOp extends Operator {
      */
     @Override
     public void initialize() throws OperatorException {
+
+        paramMap = new HashMap<String, Object>();
 
         try {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
@@ -156,8 +159,11 @@ public class HysteresisThresholdingOp extends Operator {
                 throw new OperatorException("Cannot get source tile");
             }
 
-            computeHysteresisThesholding(sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm);
-
+            paramMap.put("lowThreshold", lowThreshold);
+            paramMap.put("highThreshold", highThreshold);
+            computeThresholding(sourceBand, sourceRaster,
+                    targetTile, x0, y0, w, h, pm,
+                    ThresholdingTypeOperator.Hysteresis, paramMap);
         } catch (Throwable e) {
             OperatorUtils.catchOperatorException(getId(), e);
         } finally {
@@ -182,42 +188,13 @@ public class HysteresisThresholdingOp extends Operator {
      * @throws org.esa.beam.framework.gpf.OperatorException If an error occurs
      * during computation of the filtered value.
      */
-    private synchronized void computeHysteresisThesholding(final Band sourceBand, final Tile sourceRaster,
+    private synchronized void computeThresholding(final Band sourceBand, final Tile sourceRaster,
             final Tile targetTile, final int x0, final int y0, final int w, final int h,
-            final ProgressMonitor pm) {
+            final ProgressMonitor pm, ThresholdingTypeOperator method, Map<String, Object> paramMap) {
 
         if (!processed) {
-            final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
-            final BufferedImage fullBufferedImage = new BufferedImage(sourceBand.getSceneRasterWidth(),
-                    sourceBand.getSceneRasterHeight(),
-                    BufferedImage.TYPE_USHORT_GRAY);
-            fullBufferedImage.setData(fullRenderedImage.getData());
-
-            fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-
-//            final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
-
-            ImageStack stack = fullImagePlus.getStack();
-            ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
-            ImageStack res_hyst = new ImageStack(stack.getWidth(), stack.getHeight());
-
-            ImageProcessor tmp1 = null;
-            ImageProcessor tmp2 = null;
-
-            for (int s = 1; s <= stack.getSize(); s++) {
-//                tmp1 = ImageEdge.trin(stack.getProcessor(s), highThreshold, lowThreshold);
-                tmp1 = (ByteProcessor) trinarise((ByteProcessor) stack.getProcessor(s).convertToByte(true),
-                        highThreshold, lowThreshold);
-                res_trin.addSlice("", tmp1);
-                tmp2 = (ByteProcessor) hysteresisThresholding((ByteProcessor) tmp1.convertToByte(true));
-                res_hyst.addSlice("", tmp2);
-
-            }
-            fullByteProcessor = (ByteProcessor) new ImagePlus("Hysteresis", res_hyst).getProcessor().convertToByte(true);
-//            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-//            fullByteProcessor = (ByteProcessor) trinarise(fullByteProcessor, highThreshold, lowThreshold);
-//            fullByteProcessor = (ByteProcessor) hysteresisThresholding(fullByteProcessor);
-
+            fullByteProcessor = method.computeThresholdingOperator(
+                    sourceBand, sourceRaster, targetTile, x0, y0, w, h, pm, paramMap);
             processed = true;
         }
 
@@ -230,7 +207,8 @@ public class HysteresisThresholdingOp extends Operator {
         ImageProcessor roiImageProcessor = aPartProcessor.crop();
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((byte[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance(
+                (byte[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;

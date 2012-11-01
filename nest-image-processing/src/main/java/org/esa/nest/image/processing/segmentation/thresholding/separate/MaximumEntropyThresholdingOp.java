@@ -56,10 +56,6 @@ public class MaximumEntropyThresholdingOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
-    private float highThreshold = 100f;
-    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
-    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;

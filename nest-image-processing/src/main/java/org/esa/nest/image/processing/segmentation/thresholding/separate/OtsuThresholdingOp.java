@@ -18,6 +18,7 @@ package org.esa.nest.image.processing.segmentation.thresholding.separate;
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.plugin.ContrastEnhancer;
 import ij.process.AutoThresholder;
 import ij.process.ImageProcessor;
 import org.esa.beam.framework.datamodel.Band;
@@ -76,8 +77,8 @@ public class OtsuThresholdingOp extends Operator {
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -194,33 +195,19 @@ public class OtsuThresholdingOp extends Operator {
             fullBufferedImage.setData(fullRenderedImage.getData());
 
             fullImagePlus = new ImagePlus(sourceBand.getDisplayName(), fullBufferedImage);
-//            JOptionPane.showMessageDialog(null, fullImagePlus.getBitDepth() + ", "
-//                    + fullImagePlus.getProcessor().getCurrentColorModel(),
-//                    "getImagePlus", JOptionPane.INFORMATION_MESSAGE);
-
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
+            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
+            contrastEnhancer.equalize(fullByteProcessor);
+            fullImagePlus.setProcessor(fullByteProcessor);
 
-            ImageProcessor tmp1 = null;
-            ImageStack stack = fullImagePlus.getStack();
-            ImageStack res_trin = new ImageStack(stack.getWidth(), stack.getHeight());
+            fullByteProcessor.setAutoThreshold(AutoThresholder.Method.Otsu, false, ImageProcessor.RED_LUT);
+            fullByteProcessor.autoThreshold();
 
-            tmp1 = fullImageProcessor.convertToShort(true);
-            for (int s = 1; s <= stack.getSize(); s++) {
-//                tmp1 = ImageEdge.trin(stack.getProcessor(s), highThreshold, lowThreshold);
-                tmp1.setAutoThreshold(AutoThresholder.Method.Otsu, false, ImageProcessor.RED_LUT);
-                tmp1.autoThreshold();
-                res_trin.addSlice("", tmp1);
-            }
-            fullByteProcessor = new ImagePlus("Hysteresis", res_trin).getProcessor();//.convertToShort(true);
-//            fullByteProcessor = (ByteProcessor) new ImagePlus("Hysteresis", res_trin).getProcessor().convertToByte(true);
-
-//            fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-//            fullByteProcessor.setAutoThreshold(AutoThresholder.Method.Otsu, false, ImageProcessor.RED_LUT);
-//            fullByteProcessor.autoThreshold();
             processed = true;
         }
 
-        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
+//        final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
 
 //        ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
 
@@ -257,15 +244,19 @@ public class OtsuThresholdingOp extends Operator {
 //            grayLevelTrue.addToEnd();
 //            grayLevelFalse.removeFromBeginning();
 //        }
+//        
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        fullByteProcessor.setRoi(srcTileRectangle);
+        ImageProcessor aPartProcessor = fullByteProcessor.duplicate();
 
-        ImageProcessor roiImageProcessor = fullByteProcessor.crop();
+        aPartProcessor.setRoi(srcTileRectangle);
+
+        ImageProcessor roiImageProcessor = aPartProcessor.crop();
 
         final ProductData trgData = targetTile.getDataBuffer();
-        final ProductData sourceData = ProductData.createInstance((short[]) roiImageProcessor.getPixels());
+        final ProductData sourceData = ProductData.createInstance(
+                (byte[]) roiImageProcessor.getPixels());
 
         final int maxY = y0 + h;
         final int maxX = x0 + w;

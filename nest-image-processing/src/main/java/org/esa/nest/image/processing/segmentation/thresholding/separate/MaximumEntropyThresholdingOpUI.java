@@ -28,10 +28,6 @@ import org.esa.nest.util.DialogUtils;
 public class MaximumEntropyThresholdingOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
-    private final JLabel highThresholdLabel = new JLabel("HighThreshold");
-    private final JTextField highThreshold = new JTextField("");
-    private final JLabel lowThresholdLabel = new JLabel("LowThreshold");
-    private final JTextField lowThreshold = new JTextField("");
 
     @Override
     public JComponent CreateOpTab(String operatorName, Map<String, Object> parameterMap,
@@ -47,8 +43,6 @@ public class MaximumEntropyThresholdingOpUI extends BaseOperatorUI {
     @Override
     public void initParameters() {
         OperatorUIUtils.initBandList(bandList, getBandNames());
-        highThreshold.setText(String.valueOf(paramMap.get("highThreshold")));
-        lowThreshold.setText(String.valueOf(paramMap.get("lowThreshold")));
     }
 
     @Override
@@ -59,8 +53,6 @@ public class MaximumEntropyThresholdingOpUI extends BaseOperatorUI {
     @Override
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
-        paramMap.put("lowThreshold", Float.parseFloat(lowThreshold.getText()));
-        paramMap.put("highThreshold", Float.parseFloat(highThreshold.getText()));
     }
 
     private JComponent createPanel() {
@@ -69,10 +61,6 @@ public class MaximumEntropyThresholdingOpUI extends BaseOperatorUI {
         final GridBagConstraints gbc = DialogUtils.createGridBagConstraints();
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
-        gbc.gridy++;
-        DialogUtils.addComponent(contentPane, gbc, lowThresholdLabel, lowThreshold);
-        gbc.gridy++;
-        DialogUtils.addComponent(contentPane, gbc, highThresholdLabel, highThreshold);
         final int savedY = gbc.gridy;
         gbc.gridy++;
         gbc.gridy = savedY;
@@ -80,8 +68,6 @@ public class MaximumEntropyThresholdingOpUI extends BaseOperatorUI {
 
         contentPane.add(new JPanel(), gbc);
 
-        DialogUtils.enableComponents(lowThresholdLabel, lowThreshold, true);
-        DialogUtils.enableComponents(highThresholdLabel, highThreshold, true);
         return contentPane;
     }
 }

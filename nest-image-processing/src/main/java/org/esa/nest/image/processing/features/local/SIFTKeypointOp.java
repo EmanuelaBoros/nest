@@ -37,19 +37,20 @@ import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.MBFImage;
-import org.openimaj.image.feature.local.engine.asift.ASIFTEngine;
+import org.openimaj.image.feature.local.engine.DoGSIFTEngine;
 import org.openimaj.image.feature.local.keypoints.Keypoint;
 import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 
 /**
- * This plug-in takes as parameters a grayscale image and two thresholds (low
+ * This plug-in takes as parameters a gray scale image and two thresholds (low
  * and high), and returns the hysteresis thresholded image
  *
  * @author Emanuela Boros
+ * @since October 2012
  */
-@OperatorMetadata(alias = "SIFTKeypoint",
+@OperatorMetadata(alias = "ASIFTKeypoint",
 category = "SAR Tools\\Image Processing",
-description = "SIFTKeypoint")
+description = "ASIFTKeypoint")
 public class SIFTKeypointOp extends Operator {
 
     public static float[] probabilityHistogram;
@@ -63,27 +64,21 @@ public class SIFTKeypointOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
-    private float highThreshold = 100f;
-    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
-    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
     private boolean processed = false;
     private int halfSizeX;
     private int halfSizeY;
-    private int filterSizeX = 3;
-    private int filterSizeY = 3;
-    private static FImage fullFImage;
-    private static ASIFTEngine engine;
-//    private static LocalFeatureList<Keypoint> fullLocalFeatureList;
+    private int filterSizeX = 400;
+    private int filterSizeY = 400;
+    private static DoGSIFTEngine engine;
     private static BufferedImage fullBufferedImage;
 
     /**
      * Initializes this operator and sets the one and only target product.
-     * <p>The target product can be either defined by a field of type {@link org.esa.beam.framework.datamodel.Product}
-     * annotated with the
+     * <p>The target product can be either defined by a field of type
+     * {@link org.esa.beam.framework.datamodel.Product} annotated with the
      * {@link org.esa.beam.framework.gpf.annotations.TargetProduct TargetProduct}
      * annotation or by calling {@link #setTargetProduct} method.</p> <p>The
      * framework calls this method after it has created this operator. Any
@@ -97,7 +92,7 @@ public class SIFTKeypointOp extends Operator {
     @Override
     public void initialize() throws OperatorException {
 
-        engine = new ASIFTEngine(false, 7);
+        engine = new DoGSIFTEngine();
 
         try {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
@@ -204,11 +199,11 @@ public class SIFTKeypointOp extends Operator {
 
         final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        BufferedImage bf = fullBufferedImage.getSubimage(srcTileRectangle.x, srcTileRectangle.y,
+        BufferedImage bufferedImage = fullBufferedImage.getSubimage(srcTileRectangle.x, srcTileRectangle.y,
                 srcTileRectangle.width, srcTileRectangle.height);
-        FImage crop = ImageUtilities.createFImage(bf);
+        FImage crop = ImageUtilities.createFImage(bufferedImage);
 
-        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findKeypoints(crop);
+        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findFeatures(crop);
 
         KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
                 new MBFImage(crop, crop, crop), fullLocalFeatureList);
@@ -279,9 +274,9 @@ public class SIFTKeypointOp extends Operator {
      */
     public static class Spi extends OperatorSpi {
 
-        public Spi() {
+        public Spi()   {
             super(SIFTKeypointOp.class);
-            setOperatorUI(SIFTKeypointOpUI.class);
+            setOperatorUI(ASIFTKeypointOpUI.class);
         }
     }
 }

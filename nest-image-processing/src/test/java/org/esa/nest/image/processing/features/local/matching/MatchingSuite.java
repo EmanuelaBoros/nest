@@ -16,7 +16,7 @@ import org.junit.runners.Suite;
  * @author Emanuela
  */
 @RunWith(Suite.class)
-@Suite.SuiteClasses({SARTemplateMatcherTest.class})
+@Suite.SuiteClasses({MatcherTest.class})
 public class MatchingSuite {
 
     @BeforeClass

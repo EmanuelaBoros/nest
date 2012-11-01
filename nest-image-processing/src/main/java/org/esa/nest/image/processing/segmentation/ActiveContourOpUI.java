@@ -28,6 +28,8 @@ import org.esa.nest.util.DialogUtils;
 public class ActiveContourOpUI extends BaseOperatorUI {
 
     private final JList bandList = new JList();
+    private final JLabel iterationsLabel = new JLabel("Iterations");
+    private final JTextField nIterations = new JTextField("");
     private final JLabel stepLabel = new JLabel("Step");
     private final JTextField step = new JTextField("");
     // threshold of edges
@@ -57,6 +59,7 @@ public class ActiveContourOpUI extends BaseOperatorUI {
     @Override
     public void initParameters() {
         OperatorUIUtils.initBandList(bandList, getBandNames());
+        nIterations.setText(String.valueOf(paramMap.get("nIterations")));
         gradientThreshold.setText(String.valueOf(paramMap.get("gradientThreshold")));
         maxDistance.setText(String.valueOf(paramMap.get("maxDistance")));
         maxDisplacement.setText(String.valueOf(paramMap.get("maxDisplacement")));
@@ -72,7 +75,7 @@ public class ActiveContourOpUI extends BaseOperatorUI {
     @Override
     public void updateParameters() {
         OperatorUIUtils.updateBandList(bandList, paramMap, OperatorUIUtils.SOURCE_BAND_NAMES);
-
+        paramMap.put("nIterations", Integer.parseInt(nIterations.getText()));
         paramMap.put("GradientThreshold", Integer.parseInt(gradientThreshold.getText()));
         paramMap.put("MaximumDistance", Integer.parseInt(maxDistance.getText()));
         paramMap.put("MaximumDisplacement", Double.parseDouble(maxDisplacement.getText()));
@@ -86,6 +89,8 @@ public class ActiveContourOpUI extends BaseOperatorUI {
         final GridBagConstraints gbc = DialogUtils.createGridBagConstraints();
 
         DialogUtils.addComponent(contentPane, gbc, "Source Bands:", new JScrollPane(bandList));
+        gbc.gridy++;
+        DialogUtils.addComponent(contentPane, gbc, iterationsLabel, nIterations);
         gbc.gridy++;
         DialogUtils.addComponent(contentPane, gbc, gradientThresholdLabel, gradientThreshold);
         gbc.gridy++;
@@ -104,6 +109,7 @@ public class ActiveContourOpUI extends BaseOperatorUI {
 
         contentPane.add(new JPanel(), gbc);
 
+        DialogUtils.enableComponents(iterationsLabel, nIterations, true);
         DialogUtils.enableComponents(gradientThresholdLabel, gradientThreshold, true);
         DialogUtils.enableComponents(maxDisplacementLabel, maxDisplacement, true);
         DialogUtils.enableComponents(maxDistanceLabel, maxDistance, true);

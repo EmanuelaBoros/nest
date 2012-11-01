@@ -1,17 +1,15 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-   
+<project>
     <parent>
         <artifactId>nest</artifactId>
         <groupId>org.esa.nest</groupId>
         <version>4C-1.1</version>
     </parent>
- 
     <modelVersion>4.0.0</modelVersion>
-    
+
+    <groupId>org.esa.nest</groupId>
     <name>NEST Image Processing</name>
     <artifactId>nest-image-processing</artifactId>
-    <groupId>org.esa.nest</groupId>
     <version>4C-1.1</version>
     <inceptionYear>2012</inceptionYear>
     
@@ -178,12 +176,7 @@
         </dependency>
     </dependencies>
     <build>
-        <resources>
-      <resource>
-        <directory>src/test/resources/</directory>
-        <filtering>true</filtering>
-      </resource>
-    </resources>
+       
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -205,9 +198,10 @@
       		            <perCoreThreadCount>2</perCoreThreadCount> -->
                 </configuration>
             </plugin>
-
-
-
+            <plugin>
+                <groupId>com.bc.maven.plugins</groupId>
+                <artifactId>maven-javahelp-plugin</artifactId>
+            </plugin>
         </plugins>
     </build>
 </project>

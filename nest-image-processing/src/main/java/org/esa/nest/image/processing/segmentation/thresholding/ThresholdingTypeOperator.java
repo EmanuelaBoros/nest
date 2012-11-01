@@ -17,6 +17,7 @@ package org.esa.nest.image.processing.segmentation.thresholding;
 
 import com.bc.ceres.core.ProgressMonitor;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.plugin.ContrastEnhancer;
 import ij.process.AutoThresholder;
 import ij.process.ByteProcessor;
@@ -41,6 +42,7 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         private float lowThreshold = 10f;
         final static int MAX_VALUE = 256;
         final static int MIN_VALUE = 0;
+        private ImageStack stack;
 
         public void setHighThreshold(float highThreshold) {
             this.highThreshold = highThreshold;
@@ -68,17 +70,32 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
 
             final ImageProcessor fullImageProcessor = fullImagePlus.getProcessor();
             ByteProcessor fullByteProcessor = (ByteProcessor) fullImageProcessor.convertToByte(true);
-            ContrastEnhancer contrastEnhancer = new ContrastEnhancer();
-            contrastEnhancer.equalize(fullByteProcessor);
-            fullImagePlus.setProcessor(fullByteProcessor);
+
+            stack = fullImagePlus.getStack();
 
             return getThresholdedImage(fullByteProcessor);
         }
 
         @Override
         public ByteProcessor getThresholdedImage(ByteProcessor byteProcessor) {
-            byteProcessor = (ByteProcessor) trinarise(byteProcessor, highThreshold, lowThreshold);
-            byteProcessor = (ByteProcessor) hysteresisThresholding(byteProcessor);
+
+            ImageStack trinirisedStack = new ImageStack(stack.getWidth(), stack.getHeight());
+            ImageStack hysteresisStack = new ImageStack(stack.getWidth(), stack.getHeight());
+
+            ImageProcessor tempTrinirisedProcessor;
+            ImageProcessor tempHysteresisProcessor;
+
+            for (int i = 1; i <= stack.getSize(); i++) {
+                tempTrinirisedProcessor = (ByteProcessor) trinarise(
+                        (ByteProcessor) stack.getProcessor(i).convertToByte(true),
+                        highThreshold, lowThreshold);
+                trinirisedStack.addSlice("", tempTrinirisedProcessor);
+                tempHysteresisProcessor = (ByteProcessor) hysteresisThresholding(
+                        (ByteProcessor) tempTrinirisedProcessor.convertToByte(true));
+                hysteresisStack.addSlice("", tempHysteresisProcessor);
+            }
+            byteProcessor = (ByteProcessor) new ImagePlus("Hysteresis", hysteresisStack)
+                    .getProcessor().convertToByte(true);
             return byteProcessor;
         }
 
@@ -246,10 +263,10 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
         public ByteProcessor getThresholdedImage(ByteProcessor byteProcessor) {
 //            int[] hist = byteProcessor.getHistogram();
 //            int threshold = entropySplit(hist);
-            byteProcessor = (ByteProcessor) maximumEntropyThresholding(byteProcessor);
-//            byteProcessor.setAutoThreshold(AutoThresholder.Method.MaxEntropy, false,
-//                    ImageProcessor.RED_LUT);
-//            byteProcessor.autoThreshold();
+//            byteProcessor = (ByteProcessor) maximumEntropyThresholding(byteProcessor);
+            byteProcessor.setAutoThreshold(AutoThresholder.Method.MaxEntropy, false,
+                    ImageProcessor.RED_LUT);
+            byteProcessor.autoThreshold();
             return byteProcessor;
         }
 
@@ -670,7 +687,6 @@ public enum ThresholdingTypeOperator implements ThresholdingMethodEnforcement {
             contrastEnhancer.equalize(fullByteProcessor);
             fullImagePlus.setProcessor(fullByteProcessor);
 
-            fullImagePlus.show();
             return getThresholdedImage(fullByteProcessor);
         }
 

@@ -37,19 +37,19 @@ import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.MBFImage;
-import org.openimaj.image.feature.local.engine.DoGSIFTEngine;
+import org.openimaj.image.feature.local.engine.asift.ASIFTEngine;
 import org.openimaj.image.feature.local.keypoints.Keypoint;
 import org.openimaj.image.feature.local.keypoints.KeypointVisualizer;
 
 /**
- * This plug-in takes as parameters a gray scale image and two thresholds (low
+ * This plug-in takes as parameters a grayscale image and two thresholds (low
  * and high), and returns the hysteresis thresholded image
  *
  * @author Emanuela Boros
  */
-@OperatorMetadata(alias = "ASIFTKeypoint",
+@OperatorMetadata(alias = "SIFTKeypoint",
 category = "SAR Tools\\Image Processing",
-description = "ASIFTKeypoint")
+description = "SIFTKeypoint")
 public class ASIFTKeypointOp extends Operator {
 
     public static float[] probabilityHistogram;
@@ -63,21 +63,15 @@ public class ASIFTKeypointOp extends Operator {
     @Parameter(description = "The list of source bands.", alias = "sourceBands", itemAlias = "band",
     rasterDataNodeType = Band.class, label = "Source Bands")
     private String[] sourceBandNames;
-    @Parameter(description = "HighThreshold", defaultValue = "100", label = "HighThreshold")
-    private float highThreshold = 100f;
-    @Parameter(description = "LowThreshold", defaultValue = "10", label = "LowThreshold")
-    private float lowThreshold = 10f;
     private final Map<String, String[]> targetBandNameToSourceBandName = new HashMap<String, String[]>();
     private int sourceImageWidth;
     private int sourceImageHeight;
     private boolean processed = false;
     private int halfSizeX;
     private int halfSizeY;
-    private int filterSizeX = 3;
-    private int filterSizeY = 3;
-    private static FImage fullFImage;
-    private static DoGSIFTEngine engine;
-//    private static LocalFeatureList<Keypoint> fullLocalFeatureList;
+    private int filterSizeX = 100;
+    private int filterSizeY = 100;
+    private static ASIFTEngine engine;
     private static BufferedImage fullBufferedImage;
 
     /**
@@ -97,7 +91,7 @@ public class ASIFTKeypointOp extends Operator {
     @Override
     public void initialize() throws OperatorException {
 
-        engine = new DoGSIFTEngine();
+        engine = new ASIFTEngine(false, 7);
 
         try {
             sourceImageWidth = sourceProduct.getSceneRasterWidth();
@@ -208,9 +202,7 @@ public class ASIFTKeypointOp extends Operator {
                 srcTileRectangle.width, srcTileRectangle.height);
         FImage crop = ImageUtilities.createFImage(bf);
 
-        engine.getOptions().setGaussianSigma(lowThreshold);
-
-        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findFeatures(crop);
+        LocalFeatureList<Keypoint> fullLocalFeatureList = engine.findKeypoints(crop);
 
         KeypointVisualizer<Float[], MBFImage> kpv = new KeypointVisualizer<Float[], MBFImage>(
                 new MBFImage(crop, crop, crop), fullLocalFeatureList);
@@ -281,9 +273,9 @@ public class ASIFTKeypointOp extends Operator {
      */
     public static class Spi extends OperatorSpi {
 
-        public Spi() {
+        public Spi()  {
             super(ASIFTKeypointOp.class);
-            setOperatorUI(ASIFTKeypointOpUI.class);
+            setOperatorUI(SIFTKeypointOpUI.class);
         }
     }
 }

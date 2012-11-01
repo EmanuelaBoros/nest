@@ -17,17 +17,13 @@
         the camera axis orientation. The method permits to reliably identify features that have 
         undergone very large affine distortions measured by a new parameter, the transition tilt.<br>
 
-        The Affine-SIFT (ASIFT) simulates a set of sample views of the initial images, 
-        obtainable by varying the two camera axis orientation parameters, namely the latitude 
-        and the longitude angles, which are not treated by the SIFT method. Then it applies the 
-        SIFT method itself to all images thus generated.<br><br>
+        As described in [1], ASIFT simulates with enough accuracy all distortions caused by a variation of the camera optical axis direction. Then it applies the SIFT method. In other words, ASIFT simulates three parameters: the scale, the camera longitude angle and the latitude angle and normalizes the other three (translation and rotation), what SIFT lacked.<br><br>
 
         The ASIFT detector performs keypoint detection. 
         <br><img width="510" height="250" alt="" src="images/ASIFT.png"><br>
         Figure 1. ASIFT detected keypoints <br><br>
 
-        <p> [1] J.M. Morel and G.Yu, ASIFT, A new framework for fully affine invariant image comparison.</p>
-        SIAM Journal on Imaging Sciences, 2(2):438-469 (2009). DOI:10.1137/080732730 preprint
-        <p> [2] <a href="http://www.cmap.polytechnique.fr/~yu/research/ASIFT/demo.html">SIFT and ASIFT - online demo</a></p>
+        <p>[1] J. Morel and G. Yu. Asift: A new framework for fully aﬃne invariant image comparison. SIAM Journal on Imaging Sciences, 2(2):438–469, 2009.</p>
+        <p>[2] <a href="http://www.cmap.polytechnique.fr/~yu/research/ASIFT/demo.html">SIFT and ASIFT - online demo</a></p>
         <hr>
     </body></html>

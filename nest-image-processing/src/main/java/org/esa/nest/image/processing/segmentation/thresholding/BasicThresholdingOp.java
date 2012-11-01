@@ -194,7 +194,6 @@ public class BasicThresholdingOp extends Operator {
             } else if (getOperator().equals(Method.Hysteresis)) {
                 paramMap.put("lowThreshold", lowThreshold);
                 paramMap.put("highThreshold", highThreshold);
-                System.out.println("Compute Hysteresis");
                 computeThresholding(sourceBand, sourceRaster,
                         targetTile, x0, y0, w, h, pm,
                         ThresholdingTypeOperator.Hysteresis, paramMap);
@@ -255,11 +254,9 @@ public class BasicThresholdingOp extends Operator {
         final int maxX = x0 + w;
         for (int y = y0; y < maxY; ++y) {
             for (int x = x0; x < maxX; ++x) {
-                float f1 = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
-                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y),f1);
-                System.out.print(f1+",");
+                float fValue = sourceData.getElemFloatAt(sourceRaster.getDataBufferIndex(x, y));
+                trgData.setElemFloatAt(targetTile.getDataBufferIndex(x, y), fValue);
             }
-            System.out.println();
         }
     }
 

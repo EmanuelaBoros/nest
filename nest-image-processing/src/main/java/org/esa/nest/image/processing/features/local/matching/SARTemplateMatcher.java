@@ -30,12 +30,22 @@ import org.openimaj.image.analysis.algorithm.TemplateMatcher;
  */
 public class SARTemplateMatcher implements TemplateMatcherEnforcement {
 
-    FImage image;
-    FImage template;
-    Rectangle srcTileRectangle;
+    public enum Mode {
 
+        SUM_SQUARED_DIFFERENCE, NORM_SUM_SQUARED_DIFFERENCE, CORRELATION,
+        NORM_CORRELATION, CORRELATION_COEFFICIENT, NORM_CORRELATION_COEFFICIENT
+    }
+
+    /**
+     * Compute the score at a point as the sum-squared difference between the
+     * image and the template with the top-left at the given point. The
+     * SARTemplateMatcher will account for the offset to the center of the
+     * template internally.
+     *
+     */
     @Override
-    public float computeMatchScore(Band sourceBand, Tile templateTile, int x, int y,
+    public float computeMatchScore(final Band sourceBand, final Tile sourceRaster,
+            final Band targetBand, final Tile targetTile,
             Mode mode) {
 
         final RenderedImage fullRenderedImage = sourceBand.getSourceImage().getImage(0);
@@ -44,63 +54,64 @@ public class SARTemplateMatcher implements TemplateMatcherEnforcement {
                 sourceBand.getSceneRasterHeight(),
                 BufferedImage.TYPE_USHORT_GRAY);
         fullBufferedImage.setData(fullRenderedImage.getData());
-        image = ImageUtilities.createFImage(fullBufferedImage);
+        final Rectangle srcTileRectangle = sourceRaster.getRectangle();
 
-        srcTileRectangle = templateTile.getRectangle();
-
-        BufferedImage bf = fullBufferedImage.getSubimage(srcTileRectangle.x, srcTileRectangle.y,
+        BufferedImage imageBuffer = fullBufferedImage.getSubimage(
+                srcTileRectangle.x, srcTileRectangle.y,
                 srcTileRectangle.width, srcTileRectangle.height);
-        template = ImageUtilities.createFImage(bf);
-        final float[][] imageData = image.pixels;
-        final float[][] templateData = template.pixels;
-        float fNorm;
-        switch (mode) {
-            case SUM_SQUARED_DIFFERENCE:
-                fNorm = TemplateMatcher.Mode.SUM_SQUARED_DIFFERENCE.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            case NORM_SUM_SQUARED_DIFFERENCE:
-                fNorm = TemplateMatcher.Mode.NORM_SUM_SQUARED_DIFFERENCE.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            case CORRELATION:
-                fNorm = TemplateMatcher.Mode.CORRELATION.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            case NORM_CORRELATION:
-                fNorm = TemplateMatcher.Mode.NORM_CORRELATION.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            case CORRELATION_COEFFICIENT:
-                fNorm = TemplateMatcher.Mode.CORRELATION_COEFFICIENT.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            case NORM_CORRELATION_COEFFICIENT:
-                fNorm = TemplateMatcher.Mode.CORRELATION_COEFFICIENT.computeMatchScore(imageData, x, y,
-                        templateData, srcTileRectangle.x, srcTileRectangle.y, srcTileRectangle.width,
-                        srcTileRectangle.height);
-                break;
-            default:
-                fNorm = 0f;
-        }
+        FImage image = ImageUtilities.createFImage(imageBuffer);
+
+//        Rectangle templateRectangle = templateTile.getRectangle();
+//
+//        BufferedImage templateBuffer = fullBufferedImage.getSubimage(
+//                templateRectangle.x, templateRectangle.y,
+//                templateRectangle.width, templateRectangle.height);
+//        FImage template = ImageUtilities.createFImage(templateBuffer);
+//
+//        final float[][] imageData = image.pixels;
+//        final float[][] templateData = template.pixels;
+        float fNorm=0f;
+//
+//        switch (mode) {
+//            case SUM_SQUARED_DIFFERENCE:
+//                fNorm = TemplateMatcher.Mode.SUM_SQUARED_DIFFERENCE.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            case NORM_SUM_SQUARED_DIFFERENCE:
+//                fNorm = TemplateMatcher.Mode.NORM_SUM_SQUARED_DIFFERENCE.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            case CORRELATION:
+//                fNorm = TemplateMatcher.Mode.CORRELATION.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            case NORM_CORRELATION:
+//                fNorm = TemplateMatcher.Mode.NORM_CORRELATION.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            case CORRELATION_COEFFICIENT:
+//                fNorm = TemplateMatcher.Mode.CORRELATION_COEFFICIENT.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            case NORM_CORRELATION_COEFFICIENT:
+//                fNorm = TemplateMatcher.Mode.CORRELATION_COEFFICIENT.
+//                        computeMatchScore(imageData, 0, 0,
+//                        templateData, 0, 0, srcTileRectangle.width,
+//                        srcTileRectangle.height);
+//                break;
+//            default:
+//                fNorm = 0f;
+//        }
         return fNorm;
-    }
-
-    /**
-     * Compute the score at a point as the sum-squared difference between the
-     * image and the template with the top-left at the given point. The
-     * SARTemplateMatcher will account for the offset to the centre of the
-     * template internally.
-     *
-     */
-    public enum Mode {
-
-        SUM_SQUARED_DIFFERENCE, NORM_SUM_SQUARED_DIFFERENCE, CORRELATION,
-        NORM_CORRELATION, CORRELATION_COEFFICIENT, NORM_CORRELATION_COEFFICIENT
     }
 }
